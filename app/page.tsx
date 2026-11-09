@@ -109,13 +109,14 @@ const demoPlays: Play[] = [
 const demoLineups: Lineup[] = [
   { id: "l1", name: "Sunday Pressure", format: "Fantasy · PPR", quarterback: "Justin Herbert", runningBack: "Christian McCaffrey", receiver: "CeeDee Lamb", tightEnd: "Travis Kelce", note: "High-floor core with a premium receiving back." }
 ];
-const localProgressKeys = ["gc-plays", "gc-lineups", "gc-favorites", "gc-team-players", "gc-player-ratings", "gc-theme", "gc-poll", "gc-recent-players"];
+const localProgressKeys = ["gc-plays", "gc-lineups", "gc-favorites", "gc-player-tags", "gc-team-players", "gc-player-ratings", "gc-theme", "gc-poll", "gc-recent-players", "gc-fan-tools"];
 function createDefaultProgress(): UserProgress {
   return {
     version: 1,
     plays: demoPlays,
     lineups: demoLineups,
     favorites: [],
+    playerTags: {},
     teamPlayers: [],
     playerRatings: {},
     darkMode: false,
@@ -129,26 +130,36 @@ function readBrowserProgress(): UserProgress {
   const savedPlays = localStorage.getItem("gc-plays");
   const savedLineups = localStorage.getItem("gc-lineups");
   const savedFavorites = localStorage.getItem("gc-favorites");
+  const savedPlayerTags = localStorage.getItem("gc-player-tags");
   const savedTeamPlayers = localStorage.getItem("gc-team-players");
   const savedRatings = localStorage.getItem("gc-player-ratings");
   const savedTheme = localStorage.getItem("gc-theme");
   const savedPoll = localStorage.getItem("gc-poll");
   const savedRecent = localStorage.getItem("gc-recent-players");
+  const savedFanTools = localStorage.getItem("gc-fan-tools");
+  const previousFanTools = savedFanTools ? JSON.parse(savedFanTools) as {
+    favorites?: string[];
+    ratings?: Record<string, number>;
+    tags?: Record<string, string[]>;
+    recent?: string[];
+    theme?: "light" | "dark";
+  } : null;
   const poll = savedPoll ? JSON.parse(savedPoll) as { votes?: { chargers?: number; chiefs?: number }; choice?: string } : null;
   const raw = {
     ...defaults,
     plays: savedPlays ? JSON.parse(savedPlays) as Play[] : defaults.plays,
     lineups: savedLineups ? JSON.parse(savedLineups) as Lineup[] : defaults.lineups,
-    favorites: savedFavorites ? JSON.parse(savedFavorites) as string[] : defaults.favorites,
+    favorites: savedFavorites ? JSON.parse(savedFavorites) as string[] : previousFanTools?.favorites || defaults.favorites,
+    playerTags: savedPlayerTags ? JSON.parse(savedPlayerTags) as Record<string, string[]> : previousFanTools?.tags || defaults.playerTags,
     teamPlayers: savedTeamPlayers ? JSON.parse(savedTeamPlayers) as string[] : defaults.teamPlayers,
-    playerRatings: savedRatings ? JSON.parse(savedRatings) as Record<string, number> : defaults.playerRatings,
-    darkMode: savedTheme ? savedTheme === "dark" : defaults.darkMode,
+    playerRatings: savedRatings ? JSON.parse(savedRatings) as Record<string, number> : previousFanTools?.ratings || defaults.playerRatings,
+    darkMode: savedTheme ? savedTheme === "dark" : previousFanTools?.theme === "dark" || defaults.darkMode,
     pollVotes: poll?.votes ? {
       chargers: Number(poll.votes.chargers) || 0,
       chiefs: Number(poll.votes.chiefs) || 0
     } : defaults.pollVotes,
     userVote: poll?.choice === "chargers" || poll?.choice === "chiefs" ? poll.choice : "",
-    recentlyViewed: savedRecent ? JSON.parse(savedRecent) as string[] : defaults.recentlyViewed
+    recentlyViewed: savedRecent ? JSON.parse(savedRecent) as string[] : previousFanTools?.recent || defaults.recentlyViewed
   };
   const parsed = userProgressSchema.safeParse(raw);
   if (!parsed.success) throw new Error("Browser progress is not valid.");
@@ -165,6 +176,7 @@ function mergeProgress(guest: UserProgress, account: UserProgress): UserProgress
     plays: mergeById(guest.plays, account.plays),
     lineups: mergeById(guest.lineups, account.lineups),
     favorites: [...new Set([...guest.favorites, ...account.favorites])],
+    playerTags: { ...guest.playerTags, ...account.playerTags },
     teamPlayers: [...new Set([...guest.teamPlayers, ...account.teamPlayers])],
     playerRatings: { ...guest.playerRatings, ...account.playerRatings },
     recentlyViewed: [...new Set([...account.recentlyViewed, ...guest.recentlyViewed])].slice(0, 5)
@@ -249,7 +261,9 @@ export default function Home() {
   const [formError, setFormError] = useState("");
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [playerTags, setPlayerTags] = useState<Record<string, string[]>>({});
   const [teamPlayers, setTeamPlayers] = useState<string[]>([]);
+  const [tagDrafts, setTagDrafts] = useState<Record<string, string>>({});
   const [playerRatings, setPlayerRatings] = useState<Record<string, number>>({});
   const [playerFilter, setPlayerFilter] = useState<"all" | "favorites" | "team">("all");
   const [sortBy, setSortBy] = useState("name");
@@ -275,13 +289,14 @@ export default function Home() {
     plays,
     lineups,
     favorites,
+    playerTags,
     teamPlayers,
     playerRatings,
     darkMode,
     pollVotes,
     userVote,
     recentlyViewed
-  }), [plays, lineups, favorites, teamPlayers, playerRatings, darkMode, pollVotes, userVote, recentlyViewed]);
+  }), [plays, lineups, favorites, playerTags, teamPlayers, playerRatings, darkMode, pollVotes, userVote, recentlyViewed]);
   const progressRef = useRef(progressSnapshot);
   progressRef.current = progressSnapshot;
 
@@ -289,6 +304,7 @@ export default function Home() {
     setPlays(progress.plays.map(play => ({ ...play, tags: Array.isArray(play.tags) ? play.tags : [] })));
     setLineups(progress.lineups);
     setFavorites(progress.favorites);
+    setPlayerTags(progress.playerTags || {});
     setTeamPlayers(progress.teamPlayers);
     setPlayerRatings(progress.playerRatings);
     setDarkMode(progress.darkMode);
@@ -414,6 +430,7 @@ export default function Home() {
       localStorage.setItem("gc-plays", JSON.stringify(plays));
       localStorage.setItem("gc-lineups", JSON.stringify(lineups));
       localStorage.setItem("gc-favorites", JSON.stringify(favorites));
+      localStorage.setItem("gc-player-tags", JSON.stringify(playerTags));
       localStorage.setItem("gc-team-players", JSON.stringify(teamPlayers));
       localStorage.setItem("gc-player-ratings", JSON.stringify(playerRatings));
       localStorage.setItem("gc-theme", darkMode ? "dark" : "light");
@@ -422,7 +439,7 @@ export default function Home() {
       hasGuestProgressRef.current = JSON.stringify(progressSnapshot) !== JSON.stringify(createDefaultProgress());
     }
     catch { setToast("Browser storage is full. Changes may not persist."); }
-  }, [plays, lineups, favorites, teamPlayers, playerRatings, darkMode, pollVotes, userVote, recentlyViewed, progressSnapshot, ready, isLoaded, isSignedIn]);
+  }, [plays, lineups, favorites, playerTags, teamPlayers, playerRatings, darkMode, pollVotes, userVote, recentlyViewed, progressSnapshot, ready, isLoaded, isSignedIn]);
 
   useEffect(() => {
     if (!ready || !isLoaded || !isSignedIn || !accountUserId || !cloudReady || cloudOwnerId !== accountUserId) return;
@@ -578,6 +595,38 @@ export default function Home() {
     setPlayerRatings(old => ({ ...old, [playerId]: rating }));
     setToast(isSignedIn ? "Your player rating will sync to your account." : "Your player rating is saved on this device.");
   };
+  const addPlayerTag = (playerId: string) => {
+    const tag = (tagDrafts[playerId] || "").trim().replace(/\s+/g, " ");
+    if (!tag) { setToast("Enter a tag before adding it."); return; }
+    if (tag.length > 20) { setToast("Tags must be 20 characters or fewer."); return; }
+    const current = playerTags[playerId] || [];
+    if (current.some(existing => existing.toLowerCase() === tag.toLowerCase())) { setToast("That tag is already on this player."); return; }
+    if (current.length >= 5) { setToast("A player can have up to five tags."); return; }
+    setPlayerTags(old => ({ ...old, [playerId]: [...(old[playerId] || []), tag] }));
+    setTagDrafts(old => ({ ...old, [playerId]: "" }));
+    setToast(isSignedIn ? `Tag added for your account: ${tag}` : `Tag saved on this device: ${tag}`);
+  };
+  const downloadPlayerCsv = () => {
+    const rows = [
+      ["Name", "Team", "Position", "Games", "Primary stat", "Favorite", "Fan rating", "Tags"],
+      ...filteredPlayers.map(player => {
+        const stat = primaryStat(player);
+        return [player.name, player.team, player.position, String(player.games), `${stat.label}: ${stat.value}`, favorites.includes(player.id) ? "Yes" : "No", playerRatings[player.id] ? `${playerRatings[player.id]}/5` : "", (playerTags[player.id] || []).join(" | ")];
+      })
+    ];
+    const csv = rows.map(row => row.map(value => {
+      const text = String(value);
+      const safeText = /^[=+\-@]/.test(text) ? `'${text}` : text;
+      return `"${safeText.replace(/"/g, '""')}"`;
+    }).join(",")).join("\r\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "gridiron-player-scouting.csv";
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setToast(`Exported ${filteredPlayers.length} player${filteredPlayers.length === 1 ? "" : "s"} to CSV.`);
+  };
   const newFilmPrompt = () => {
     const choices = filmPrompts.filter(prompt => prompt !== filmPrompt);
     setFilmPrompt(choices[Math.floor(Math.random() * choices.length)] || filmPrompts[0]);
@@ -714,6 +763,7 @@ export default function Home() {
               <select className="select-control" aria-label="Filter by position" value={position} onChange={event => setPosition(event.target.value)}>{["All positions", "QB", "RB", "WR", "TE"].map(value => <option key={value}>{value}</option>)}</select>
               <select className="select-control" aria-label="Filter player group" value={playerFilter} onChange={event => setPlayerFilter(event.target.value as "all" | "favorites" | "team")}><option value="all">All players</option><option value="favorites">Favorites ({favorites.length})</option><option value="team">My team ({teamPlayers.length})</option></select>
               <select className="select-control" aria-label="Sort players" value={sortBy} onChange={event => setSortBy(event.target.value)}><option value="name">Sort: name</option><option value="yards">Sort: primary yards</option><option value="touchdowns">Sort: touchdowns</option></select>
+              <button className="secondary-button" onClick={downloadPlayerCsv}>Export CSV</button>
             </div>
           </div>
           {filteredPlayers.length ? <div className="player-grid">{filteredPlayers.map(player => <article className="player-card" key={player.id}>
@@ -725,6 +775,10 @@ export default function Home() {
             <div className="player-rating" role="group" aria-label={`Your rating for ${player.name}`}>
               <span>Your rating</span>{[1, 2, 3, 4, 5].map(star => <button key={star} aria-label={`Rate ${player.name} ${star} out of 5`} aria-pressed={(playerRatings[player.id] || 0) === star} onClick={() => setRating(player.id, star)} className={(playerRatings[player.id] || 0) >= star ? "rated" : ""}><Icon name="star" size={13} /></button>)}
               {playerRatings[player.id] ? <b>{playerRatings[player.id]}/5</b> : <b>—</b>}
+            </div>
+            <div className="player-tags">
+              <div className="player-tag-list">{(playerTags[player.id] || []).map(tag => <span className="user-tag" key={tag}>{tag}<button type="button" aria-label={`Remove ${tag} tag from ${player.name}`} onClick={() => { setPlayerTags(old => ({ ...old, [player.id]: (old[player.id] || []).filter(item => item !== tag) })); setToast("Player tag removed."); }}>×</button></span>)}</div>
+              <div className="tag-entry"><label className="visually-hidden" htmlFor={`player-tag-${player.id}`}>Add a tag for {player.name}</label><input id={`player-tag-${player.id}`} maxLength={30} placeholder="Add player tag…" value={tagDrafts[player.id] || ""} onChange={event => setTagDrafts(old => ({ ...old, [player.id]: event.target.value }))} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); addPlayerTag(player.id); } }} /><button type="button" className="thin-button" onClick={() => addPlayerTag(player.id)}>Add</button></div>
             </div>
             <div className="player-bottom"><span className="demo-badge">{player.games ? `2026 · ${player.games} games` : "No 2026 stats reported"}</span><label className="compare-check"><input type="checkbox" checked={selected.includes(player.id)} onChange={() => togglePlayer(player.id)} /> Compare</label></div>
             <button className={`team-player-button ${teamPlayers.includes(player.id) ? "is-added" : ""}`} aria-pressed={teamPlayers.includes(player.id)} onClick={() => toggleTeamPlayer(player.id)}><Icon name={teamPlayers.includes(player.id) ? "close" : "plus"} size={13} />{teamPlayers.includes(player.id) ? "Remove from team" : "Add to team"}</button>

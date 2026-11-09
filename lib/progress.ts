@@ -30,6 +30,8 @@ export const userProgressSchema = z.object({
   plays: z.array(playSchema).max(250),
   lineups: z.array(lineupSchema).max(250),
   favorites: z.array(id).max(500),
+  playerTags: z.record(id, z.array(shortText).max(5)).default({})
+    .refine(tags => Object.keys(tags).length <= 500),
   teamPlayers: z.array(id).max(500).default([]),
   playerRatings: z.record(z.string().max(120), z.number().int().min(1).max(5))
     .refine(ratings => Object.keys(ratings).length <= 500),
