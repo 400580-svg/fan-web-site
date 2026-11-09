@@ -1,1 +1,2 @@
 - [Next.js preview origins](next-dev-origins.md) — Replit preview HMR needs both proxied `.replit.dev` hosts and `127.0.0.1` allowed.
+- [Database provider](database-provider.md) — The user selected Replit PostgreSQL for Gridiron Central's persistent data.
