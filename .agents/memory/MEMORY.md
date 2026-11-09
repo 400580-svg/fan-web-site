@@ -1,2 +1,3 @@
 - [Next.js preview origins](next-dev-origins.md) — Replit preview HMR needs both proxied `.replit.dev` hosts and `127.0.0.1` allowed.
 - [Database provider](database-provider.md) — The user selected Replit PostgreSQL for Gridiron Central's persistent data.
+- [Replit-managed Clerk in Next.js](clerk-nextjs-replit.md) — Map Replit’s public key name to Next’s SDK; avoid dynamic secret options without Clerk’s encryption key.
