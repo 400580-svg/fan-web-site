@@ -1,0 +1,1 @@
+- [Next.js preview origins](next-dev-origins.md) — Replit preview HMR needs both proxied `.replit.dev` hosts and `127.0.0.1` allowed.
