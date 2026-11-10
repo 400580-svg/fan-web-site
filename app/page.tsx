@@ -7,62 +7,17 @@ import PlayerComparisonCharts from "./components/PlayerComparisonCharts";
 import { UserProgress, userProgressSchema } from "@/lib/progress";
 import { leaderboardConfig, topTenPlayers2026, type LeaderboardPosition } from "@/lib/top-ten-2026";
 import { calculate2026SiteRatings, type SitePlayerRating } from "@/lib/player-ratings";
+import { seasonPlayers, type PlayerProfile as Player } from "@/lib/player-directory";
+import PlayCallingGame from "./components/PlayCallingGame";
 
-type View = "Overview" | "Players" | "Matchup lab" | "Playbook" | "Lineups" | "Film room";
-type Player = {
-  id: string; name: string; team: string; position: string; number: string; games: number;
-  passingYards: number | null; passingTouchdowns: number | null; interceptions: number | null; passerRating: number | null;
-  rushingYards: number | null; rushingTouchdowns: number | null;
-  receptions: number | null; receivingYards: number | null; receivingTouchdowns: number | null;
-  statsUrl: string; initials: string; note: string; positionRank?: number;
-};
+type View = "Overview" | "Players" | "Game day" | "Matchup lab" | "Playbook" | "My Team" | "Film room";
 type Play = { id: string; name: string; formation: string; personnel: string; concept: string; situation: string; note: string; tags?: string[] };
 type Lineup = { id: string; name: string; format: string; quarterback: string; runningBack: string; receiver: string; tightEnd: string; note: string };
 type ModalState = { kind: "play" | "lineup"; item?: Play | Lineup } | null;
 
-const originalPlayers: Player[] = [
-  { id: "p1", name: "Justin Herbert", team: "Los Angeles Chargers", position: "QB", number: "10", games: 8, passingYards: 1591, passingTouchdowns: 6, interceptions: 11, passerRating: 70.4, rushingYards: 190, rushingTouchdowns: 0, receptions: null, receivingYards: null, receivingTouchdowns: null, statsUrl: "https://www.nfl.com/players/justin-herbert/stats/career", initials: "JH", note: "Quick-game accuracy and layered throws" },
-  { id: "p2", name: "Patrick Mahomes", team: "Kansas City Chiefs", position: "QB", number: "15", games: 7, passingYards: 1795, passingTouchdowns: 12, interceptions: 4, passerRating: 99.7, rushingYards: 77, rushingTouchdowns: 1, receptions: null, receivingYards: null, receivingTouchdowns: null, statsUrl: "https://www.nfl.com/players/patrick-mahomes/stats/career", initials: "PM", note: "Off-platform creation and red-zone reads" },
-  { id: "p3", name: "Lamar Jackson", team: "Baltimore Ravens", position: "QB", number: "8", games: 5, passingYards: 967, passingTouchdowns: 6, interceptions: 1, passerRating: 118.4, rushingYards: 144, rushingTouchdowns: 1, receptions: null, receivingYards: null, receivingTouchdowns: null, statsUrl: "https://www.nfl.com/players/lamar-jackson/stats/career", initials: "LJ", note: "Designed run threat reshapes the box" },
-  { id: "p4", name: "CeeDee Lamb", team: "Dallas Cowboys", position: "WR", number: "88", games: 9, passingYards: null, passingTouchdowns: null, interceptions: null, passerRating: null, rushingYards: -6, rushingTouchdowns: 0, receptions: 70, receivingYards: 904, receivingTouchdowns: 7, statsUrl: "https://www.nfl.com/players/ceedee-lamb/stats/career", initials: "CL", note: "Elite separation from the slot" },
-  { id: "p5", name: "Christian McCaffrey", team: "San Francisco 49ers", position: "RB", number: "23", games: 8, passingYards: null, passingTouchdowns: null, interceptions: null, passerRating: null, rushingYards: 457, rushingTouchdowns: 9, receptions: 36, receivingYards: 270, receivingTouchdowns: 1, statsUrl: "https://www.nfl.com/players/christian-mccaffrey/stats/career", initials: "CM", note: "Three-down mismatch creator" },
-  { id: "p6", name: "A.J. Brown", team: "New England Patriots", position: "WR", number: "1", games: 3, passingYards: null, passingTouchdowns: null, interceptions: null, passerRating: null, rushingYards: null, rushingTouchdowns: null, receptions: 9, receivingYards: 101, receivingTouchdowns: 0, statsUrl: "https://www.nfl.com/players/a-j-brown/stats/career", initials: "AB", note: "Power release wins outside leverage" },
-  { id: "p7", name: "Travis Kelce", team: "Kansas City Chiefs", position: "TE", number: "87", games: 7, passingYards: null, passingTouchdowns: null, interceptions: null, passerRating: null, rushingYards: null, rushingTouchdowns: null, receptions: 29, receivingYards: 410, receivingTouchdowns: 2, statsUrl: "https://www.nfl.com/players/travis-kelce/stats/career", initials: "TK", note: "Finds soft spots against zone" },
-  { id: "p8", name: "Josh Allen", team: "Buffalo Bills", position: "QB", number: "17", games: 7, passingYards: 1793, passingTouchdowns: 11, interceptions: 5, passerRating: 101.1, rushingYards: 270, rushingTouchdowns: 9, receptions: null, receivingYards: null, receivingTouchdowns: null, statsUrl: "https://www.nfl.com/players/josh-allen/stats/career", initials: "JA", note: "Arm talent stretches every coverage" },
-  { id: "p9", name: "Tyreek Hill", team: "Free agent", position: "WR", number: "—", games: 0, passingYards: null, passingTouchdowns: null, interceptions: null, passerRating: null, rushingYards: null, rushingTouchdowns: null, receptions: null, receivingYards: null, receivingTouchdowns: null, statsUrl: "https://www.nfl.com/players/tyreek-hill/stats/career", initials: "TH", note: "NFL.com listed no 2026 regular-season line as of Nov. 9." }
-];
-const topTenNames = new Set(topTenPlayers2026.map(player => player.name));
-const rankedPlayerProfiles: Player[] = topTenPlayers2026.map(ranked => {
-  const existing = originalPlayers.find(player => player.name === ranked.name);
-  const initials = ranked.name.split(/\s+/).slice(0, 2).map(part => part.replace(/[^a-z]/gi, "")[0] || "").join("").toUpperCase();
-  return {
-    id: existing?.id || ranked.id,
-    name: ranked.name,
-    team: ranked.team,
-    position: ranked.position,
-    number: existing?.number || "—",
-    games: ranked.games,
-    passingYards: ranked.passingYards ?? null,
-    passingTouchdowns: ranked.passingTouchdowns ?? null,
-    interceptions: ranked.interceptions ?? null,
-    passerRating: ranked.passerRating ?? null,
-    rushingYards: ranked.rushingYards ?? null,
-    rushingTouchdowns: ranked.rushingTouchdowns ?? null,
-    receptions: ranked.receptions ?? null,
-    receivingYards: ranked.receivingYards ?? null,
-    receivingTouchdowns: ranked.receivingTouchdowns ?? null,
-    statsUrl: leaderboardConfig[ranked.position].sourceUrl,
-    initials: existing?.initials || initials,
-    note: existing?.note || "",
-    positionRank: ranked.rank
-  };
-});
-const seasonPlayers: Player[] = [
-  ...rankedPlayerProfiles,
-  ...originalPlayers.filter(player => !topTenNames.has(player.name))
-];
 const statsSourceUrl = "https://www.nfl.com/stats/player-stats";
 const statsCheckedAt = "November 9, 2026";
+const teamRosterPositions = ["QB", "RB", "WR", "TE"] as const;
 
 function primaryStat(player: Player) {
   if (!player.games) return { label: "2026 status", value: "No stats" };
@@ -304,6 +259,12 @@ export default function Home() {
   const activeAccountIdRef = useRef<string | null>(accountUserId);
   activeAccountIdRef.current = accountUserId;
 
+  useEffect(() => {
+    const requestedView = new URLSearchParams(window.location.search).get("view");
+    if (requestedView === "game") setView("Game day");
+    else if (requestedView === "team") setView("My Team");
+  }, []);
+
   const progressSnapshot = useMemo<UserProgress>(() => ({
     version: 1,
     plays,
@@ -507,6 +468,9 @@ export default function Home() {
     if (sortBy === "touchdowns") return (b.games ? primaryTouchdowns(b) : -1) - (a.games ? primaryTouchdowns(a) : -1);
     return a.name.localeCompare(b.name);
   }), [players, query, position, playerFilter, favorites, teamPlayers, sortBy]);
+  const currentTeamPlayers = useMemo(() => players
+    .filter(player => teamPlayers.includes(player.id))
+    .sort((a, b) => a.position.localeCompare(b.position) || a.name.localeCompare(b.name)), [players, teamPlayers]);
   const leaderboardPlayers = useMemo(() => players
     .filter(player => player.position === leaderboardPosition && player.positionRank !== undefined)
     .sort((a, b) => (a.positionRank || 0) - (b.positionRank || 0))
@@ -657,7 +621,7 @@ export default function Home() {
   const isEditing = Boolean(modal?.item);
 
   const navItems: { title: View; icon: string }[] = [
-    { title: "Overview", icon: "grid" }, { title: "Players", icon: "users" }, { title: "Matchup lab", icon: "compare" }, { title: "Playbook", icon: "book" }, { title: "Lineups", icon: "lineup" }, { title: "Film room", icon: "film" }
+    { title: "Overview", icon: "grid" }, { title: "Players", icon: "users" }, { title: "Game day", icon: "play" }, { title: "Matchup lab", icon: "compare" }, { title: "Playbook", icon: "book" }, { title: "My Team", icon: "lineup" }, { title: "Film room", icon: "film" }
   ];
   const syncLabel = !isLoaded
     ? "CHECKING ACCOUNT"
@@ -672,7 +636,7 @@ export default function Home() {
         <img src="/gridiron-mark.svg" alt="" width="48" height="48" />
         <div className="eyebrow">Gridiron Central account</div>
         <h1>{syncStatus === "error" ? "Progress could not sync" : "Loading your saved progress"}</h1>
-        <p>{syncStatus === "error" ? "Your account is signed in, but saved data could not be reached. Retry the sync or continue as a guest." : "Your playbook, lineups, favorites, and ratings are being loaded securely."}</p>
+      <p>{syncStatus === "error" ? "Your account is signed in, but saved data could not be reached. Retry the sync or continue as a guest." : "Your playbook, team, favorites, and ratings are being loaded securely."}</p>
         {syncStatus === "error"
           ? <div className="account-loading-actions"><button className="primary-button" onClick={() => setSyncAttempt(value => value + 1)}>Retry sync</button><button className="secondary-button" onClick={() => void signOut({ redirectUrl: "/" })}>Continue as guest</button></div>
           : <span className="sync-spinner" aria-label="Loading" />}
@@ -705,7 +669,7 @@ export default function Home() {
           <div className="stat-strip">
             <div className="stat-card"><div><div className="stat-label">Player profiles</div><div className="stat-value">{players.length}</div><div className="stat-meta">2026 SEASON SNAPSHOT</div></div><div className="stat-mark"><Icon name="users" size={16} /></div></div>
             <div className="stat-card"><div><div className="stat-label">Your playbook</div><div className="stat-value">{plays.length}</div><div className="stat-meta">SAVED CONCEPTS</div></div><div className="stat-mark"><Icon name="book" size={16} /></div></div>
-            <div className="stat-card"><div><div className="stat-label">Lineup boards</div><div className="stat-value">{lineups.length}</div><div className="stat-meta">{isSignedIn ? "ACCOUNT ROSTERS" : "LOCAL ROSTERS"}</div></div><div className="stat-mark"><Icon name="lineup" size={16} /></div></div>
+            <div className="stat-card"><div><div className="stat-label">Current team</div><div className="stat-value">{teamPlayers.length}</div><div className="stat-meta">SAVED PLAYERS</div></div><div className="stat-mark"><Icon name="lineup" size={16} /></div></div>
             <div className="stat-card"><div><div className="stat-label">Your favorites</div><div className="stat-value">{favorites.length}</div><div className="stat-meta">SAVED PLAYERS</div></div><div className="stat-mark"><Icon name="star" size={16} /></div></div>
           </div>
           <div className="dashboard-grid">
@@ -750,7 +714,7 @@ export default function Home() {
           </div>
           <div className="section-head"><div><div className="eyebrow">Get into the details</div><h2>Choose your angle</h2></div></div>
           <div className="stat-strip">
-            {[["Player directory", "Search the 2026 player pool by name, position, or team.", "Players", "users"], ["Build your playbook", "Save formations, concepts, and the situations they fit.", "Playbook", "book"], ["Set your lineup", "Put a custom roster board together for your league.", "Lineups", "lineup"], ["Six football lenses", "Compare tactical perspectives from a simulated panel.", "Film room", "film"]].map(([title, desc, destination, icon]) => <button className="stat-card" key={title} onClick={() => goto(destination as View)} style={{ textAlign: "left", width: "100%", border: "1px solid var(--line)" }}><div><div className="stat-label">{title}</div><div className="section-sub" style={{ maxWidth: 195, lineHeight: 1.45 }}>{desc}</div></div><div className="stat-mark"><Icon name={icon} size={16} /></div></button>)}
+            {[["Player directory", "Search the 2026 player pool by name, position, or team.", "Players", "users"], ["Build your playbook", "Save formations, concepts, and the situations they fit.", "Playbook", "book"], ["Your current team", "See every player you have added from the directory.", "My Team", "lineup"], ["Six football lenses", "Compare tactical perspectives from a simulated panel.", "Film room", "film"]].map(([title, desc, destination, icon]) => <button className="stat-card" key={title} onClick={() => goto(destination as View)} style={{ textAlign: "left", width: "100%", border: "1px solid var(--line)" }}><div><div className="stat-label">{title}</div><div className="section-sub" style={{ maxWidth: 195, lineHeight: 1.45 }}>{desc}</div></div><div className="stat-mark"><Icon name={icon} size={16} /></div></button>)}
           </div>
         </>}
 
@@ -809,6 +773,34 @@ export default function Home() {
           <p className="demo-badge" style={{ marginTop: 13 }}>Directory profiles use NFL.com stats; position rankings use StatMuse 2026 leader data. Both are snapshots checked {statsCheckedAt}, not live feeds. <a href={statsSourceUrl} target="_blank" rel="noreferrer">NFL.com stats</a> · <a href={leaderboardConfig[leaderboardPosition].sourceUrl} target="_blank" rel="noreferrer">Selected leaderboard source</a>.</p>
         </section>}
 
+        {view === "My Team" && <section className="section-layout current-team-view">
+          <div className="section-head" style={{ marginTop: 4 }}>
+            <div><div className="eyebrow">Your saved roster</div><h2>My Team</h2><div className="section-sub">{isSignedIn ? "Your players sync to your account." : "Your players are saved in this browser."} Add or remove players in the directory.</div></div>
+            <button className="primary-button" onClick={() => { setPlayerFilter("all"); setQuery(""); setPosition("All positions"); goto("Players"); }}><Icon name="plus" size={14} /> Add players</button>
+          </div>
+          <div className="my-team-summary">
+            <div className="my-team-total"><span>ROSTER SIZE</span><b>{currentTeamPlayers.length}</b><small>players</small></div>
+            {teamRosterPositions.map(teamPosition => <div className="my-team-position-count" key={teamPosition}><span>{teamPosition}</span><b>{currentTeamPlayers.filter(player => player.position === teamPosition).length}</b></div>)}
+          </div>
+          {currentTeamPlayers.length
+            ? <div className="my-team-groups">{teamRosterPositions.map(teamPosition => {
+              const group = currentTeamPlayers.filter(player => player.position === teamPosition);
+              if (!group.length) return null;
+              return <section className="my-team-group" key={teamPosition}>
+                <header><h3>{teamPosition}</h3><span>{group.length} {group.length === 1 ? "player" : "players"}</span></header>
+                <div className="player-grid">{group.map(player => <article className="player-card current-team-card" key={player.id}>
+                  <div className="player-top"><div className="player-avatar">{player.initials}</div><div><button className="player-name player-name-link" onClick={() => openPlayer(player)}>{player.name}</button><div className="player-team">{player.team}</div></div><span className="position-tag">{player.position}</span></div>
+                  <div className="player-stats">{playerStatRows(player).map(stat => <div className="player-stat" key={stat.label}><span>{stat.label}</span><b>{stat.value}</b></div>)}</div>
+                  <SiteRatingDisplay rating={siteRatings[player.id] ?? null} position={player.position} />
+                  <div className="current-team-card-footer"><span className="demo-badge">{player.games ? `2026 · ${player.games} games` : "No 2026 stats reported"}</span><button className="team-player-button is-added" aria-label={`Remove ${player.name} from your team`} onClick={() => toggleTeamPlayer(player.id)}><Icon name="close" size={13} /> Remove</button></div>
+                </article>)}</div>
+              </section>;
+            })}</div>
+            : <div className="empty-state current-team-empty"><strong>Your team is empty</strong><p>Browse the player directory and add players to build your roster. Your saved team will appear here.</p><button className="primary-button" onClick={() => { setPlayerFilter("all"); setQuery(""); setPosition("All positions"); goto("Players"); }}><Icon name="users" size={14} /> Browse players</button></div>}
+        </section>}
+
+        {view === "Game day" && <PlayCallingGame players={players} teamPlayers={teamPlayers} isSignedIn={Boolean(isSignedIn)} />}
+
         {view === "Matchup lab" && <section className="section-layout">
           <div className="section-head" style={{ marginTop: 4 }}><div><div className="eyebrow">Head-to-head breakdown</div><h2>Matchup lab</h2><div className="section-sub">Select two players in the directory or compare the default 2026 season snapshot.</div></div><button className="secondary-button" onClick={() => goto("Players")}>Browse players <Icon name="arrow" size={13} /></button></div>
           <div className="notice">Player statistics are 2026 regular-season snapshots checked {statsCheckedAt}; NFL.com supplies directory profiles and StatMuse supplies position-ranked entries. Neither updates live. Scouting notes and the analyst panel are illustrative.</div>
@@ -818,14 +810,10 @@ export default function Home() {
           <div className="analysis-grid">{experts.map((expert, index) => <article className="analyst-card" key={expert.name}><div className="analyst-top"><span className="analyst-number">0{index + 1}</span><div><div className="analyst-name">{expert.name}</div><div className="analyst-role">{expert.role}</div></div></div><p>{expert.text}</p><div className="analyst-pick">Key read <b>{expert.pick}</b></div></article>)}</div>
         </section>}
 
-        {(view === "Playbook" || view === "Lineups") && <section className="section-layout">
-          <div className="section-head" style={{ marginTop: 4 }}><div><div className="eyebrow">{isSignedIn ? "Your account workspace" : "Your local workspace"}</div><h2>{view === "Playbook" ? "Custom playbook" : "Lineup manager"}</h2><div className="section-sub">{view === "Playbook" ? "Capture concepts, formations, and the situations they answer." : "Keep a custom lineup board for your fantasy decisions."} {isSignedIn ? "Synced to your account." : "Saved in this browser only."}</div></div><div className="section-actions"><button className="secondary-button" onClick={() => downloadCsv(view === "Playbook" ? "plays" : "lineups")}>Export CSV</button><button className="primary-button" onClick={() => openEditor(view === "Playbook" ? "play" : "lineup")}><Icon name="plus" size={15} /> {view === "Playbook" ? "Add a play" : "Create lineup"}</button></div></div>
-          {view === "Playbook" ? <>
-            <div className="section-toolbar"><span className="section-sub">{plays.length} saved concepts</span><label className="tag-filter">Filter by tag <select className="select-control" aria-label="Filter plays by tag" value={playTagFilter} onChange={event => setPlayTagFilter(event.target.value)}><option>All tags</option>{playTags.map(tag => <option key={tag}>{tag}</option>)}</select></label></div>
-            <div className="panel table-panel"><table className="data-table"><thead><tr><th>Concept / play name</th><th>Formation</th><th>Personnel</th><th>Situation &amp; tags</th><th>Actions</th></tr></thead><tbody>{filteredPlays.map(play => <tr key={play.id}><td><strong>{play.name}</strong><div className="section-sub">{play.note || play.concept}</div></td><td>{play.formation}</td><td><span className="tag">{play.personnel}</span></td><td><span className="tag gold">{play.situation}</span><div className="play-tags">{(play.tags || []).map(tag => <span className="tag" key={tag}>{tag}</span>)}</div></td><td><div className="table-actions"><button className="icon-button" aria-label={`Edit ${play.name}`} onClick={() => openEditor("play", play)}><Icon name="edit" size={14} /></button><button className="icon-button" aria-label={`Delete ${play.name}`} onClick={() => removeItem("play", play.id)}><Icon name="trash" size={14} /></button></div></td></tr>)}</tbody></table>{filteredPlays.length === 0 && plays.length > 0 && <div className="empty-state"><strong>No plays match this tag</strong><p>Try another tag or add a concept to your call sheet.</p><button className="secondary-button" onClick={() => setPlayTagFilter("All tags")}>Show all plays</button></div>}{plays.length === 0 && <div className="empty-state"><strong>Your playbook is open</strong><p>Add a concept to start building your call sheet.</p><button className="primary-button" onClick={() => openEditor("play")}><Icon name="plus" size={14} /> Add your first play</button></div>}</div>
-          </> :
-            <div className="player-grid" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(265px,1fr))" }}>{lineups.map(lineup => <article className="player-card" key={lineup.id}><div className="player-top"><div className="player-avatar"><Icon name="lineup" size={20} /></div><div><div className="player-name">{lineup.name}</div><div className="player-team">{lineup.format}</div></div></div><div className="player-stats" style={{ gridTemplateColumns: "repeat(2,1fr)" }}>{[["QB", lineup.quarterback], ["RB", lineup.runningBack], ["WR", lineup.receiver], ["TE", lineup.tightEnd]].map(([pos, name]) => <div className="player-stat" key={pos}><span>{pos}</span><b style={{ font: "600 11px var(--font-body)", lineHeight: 1.25, marginTop: 6 }}>{name}</b></div>)}</div><div className="player-bottom"><span className="demo-badge">{lineup.note || "Custom lineup"}</span><div className="table-actions"><button className="icon-button" aria-label={`Edit ${lineup.name}`} onClick={() => openEditor("lineup", lineup)}><Icon name="edit" size={14} /></button><button className="icon-button" aria-label={`Delete ${lineup.name}`} onClick={() => removeItem("lineup", lineup.id)}><Icon name="trash" size={14} /></button></div></div></article>)}
-              {!lineups.length && <div className="empty-state"><strong>Empty lineup board</strong><p>Build your first roster snapshot. {isSignedIn ? "It will be saved to your account." : "It stays on this device."}</p><button className="primary-button" onClick={() => openEditor("lineup")}><Icon name="plus" size={14} /> Create lineup</button></div>}</div>}
+        {view === "Playbook" && <section className="section-layout">
+          <div className="section-head" style={{ marginTop: 4 }}><div><div className="eyebrow">{isSignedIn ? "Your account workspace" : "Your local workspace"}</div><h2>Custom playbook</h2><div className="section-sub">Capture concepts, formations, and the situations they answer. {isSignedIn ? "Synced to your account." : "Saved in this browser only."}</div></div><div className="section-actions"><button className="secondary-button" onClick={() => downloadCsv("plays")}>Export CSV</button><button className="primary-button" onClick={() => openEditor("play")}><Icon name="plus" size={15} /> Add a play</button></div></div>
+          <div className="section-toolbar"><span className="section-sub">{plays.length} saved concepts</span><label className="tag-filter">Filter by tag <select className="select-control" aria-label="Filter plays by tag" value={playTagFilter} onChange={event => setPlayTagFilter(event.target.value)}><option>All tags</option>{playTags.map(tag => <option key={tag}>{tag}</option>)}</select></label></div>
+          <div className="panel table-panel"><table className="data-table"><thead><tr><th>Concept / play name</th><th>Formation</th><th>Personnel</th><th>Situation &amp; tags</th><th>Actions</th></tr></thead><tbody>{filteredPlays.map(play => <tr key={play.id}><td><strong>{play.name}</strong><div className="section-sub">{play.note || play.concept}</div></td><td>{play.formation}</td><td><span className="tag">{play.personnel}</span></td><td><span className="tag gold">{play.situation}</span><div className="play-tags">{(play.tags || []).map(tag => <span className="tag" key={tag}>{tag}</span>)}</div></td><td><div className="table-actions"><button className="icon-button" aria-label={`Edit ${play.name}`} onClick={() => openEditor("play", play)}><Icon name="edit" size={14} /></button><button className="icon-button" aria-label={`Delete ${play.name}`} onClick={() => removeItem("play", play.id)}><Icon name="trash" size={14} /></button></div></td></tr>)}</tbody></table>{filteredPlays.length === 0 && plays.length > 0 && <div className="empty-state"><strong>No plays match this tag</strong><p>Try another tag or add a concept to your call sheet.</p><button className="secondary-button" onClick={() => setPlayTagFilter("All tags")}>Show all plays</button></div>}{plays.length === 0 && <div className="empty-state"><strong>Your playbook is open</strong><p>Add a concept to start building your call sheet.</p><button className="primary-button" onClick={() => openEditor("play")}><Icon name="plus" size={14} /> Add your first play</button></div>}</div>
         </section>}
 
         {view === "Film room" && <section className="section-layout">
