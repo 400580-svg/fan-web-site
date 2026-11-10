@@ -6,6 +6,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import PlayerComparisonCharts from "./components/PlayerComparisonCharts";
 import { UserProgress, userProgressSchema } from "@/lib/progress";
 import { leaderboardConfig, topTenPlayers2026, type LeaderboardPosition } from "@/lib/top-ten-2026";
+import { calculate2026SiteRatings, type SitePlayerRating } from "@/lib/player-ratings";
 
 type View = "Overview" | "Players" | "Matchup lab" | "Playbook" | "Lineups" | "Film room";
 type Player = {
@@ -73,6 +74,24 @@ function leaderboardStat(player: Player) {
   if (player.position === "QB") return { label: "Pass yards", value: player.passingYards?.toLocaleString("en-US") ?? "—" };
   if (player.position === "RB") return { label: "Rush yards", value: player.rushingYards?.toLocaleString("en-US") ?? "—" };
   return { label: "Receiving yards", value: player.receivingYards?.toLocaleString("en-US") ?? "—" };
+}
+function SiteRatingDisplay({ rating, position, compact = false }: { rating: SitePlayerRating; position: string; compact?: boolean }) {
+  const metric = leaderboardConfig[position as LeaderboardPosition]?.metric || "2026 stats";
+  const accessibleRating = rating === null
+    ? "No verified 2026 stats"
+    : `${rating} out of 5 stars, based on ${metric.toLowerCase()}`;
+  return <div className={`site-rating ${compact ? "compact" : ""}`} aria-label={`Site rating: ${accessibleRating}`}>
+    <span className="site-rating-label">Site rating</span>
+    {rating === null
+      ? <span className="site-rating-unrated">Not rated</span>
+      : <>
+        <span className="site-rating-stars" aria-hidden="true">{compact
+          ? <span className="filled">★</span>
+          : [1, 2, 3, 4, 5].map(star => <span key={star} className={star <= rating ? "filled" : ""}>★</span>)}</span>
+        <b>{rating}/5</b>
+      </>}
+    {!compact && <small>2026 {metric.toLowerCase()} vs. same-position players</small>}
+  </div>;
 }
 function primaryYards(player: Player) {
   if (player.position === "QB") return player.passingYards;
@@ -491,6 +510,7 @@ export default function Home() {
     .filter(player => player.position === leaderboardPosition && player.positionRank !== undefined)
     .sort((a, b) => (a.positionRank || 0) - (b.positionRank || 0))
     .slice(0, 10), [players, leaderboardPosition]);
+  const siteRatings = useMemo(() => calculate2026SiteRatings(players), [players]);
   const filteredPlays = useMemo(() => plays.filter(play => playTagFilter === "All tags" || play.tags?.includes(playTagFilter)), [plays, playTagFilter]);
   const playTags = [...new Set(plays.flatMap(play => play.tags || []))].sort((a, b) => a.localeCompare(b));
   const totalPollVotes = pollVotes.chargers + pollVotes.chiefs;
@@ -749,12 +769,13 @@ export default function Home() {
                 return <div className="leaderboard-row" key={player.id}>
                   <span className="leaderboard-rank">{String(player.positionRank).padStart(2, "0")}</span>
                   <button className="leaderboard-name" onClick={() => openPlayer(player)}>{player.name}<small>{player.team}</small></button>
-                  <div className="leaderboard-stat"><b>{stat.value}</b><small>{stat.label}</small></div>
+                  <div className="leaderboard-stat"><b>{stat.value}</b><small>{stat.label}</small><SiteRatingDisplay rating={siteRatings[player.id] ?? null} position={player.position} compact /></div>
                   <button className={`team-player-button leaderboard-add ${onTeam ? "is-added" : ""}`} aria-pressed={onTeam} onClick={() => toggleTeamPlayer(player.id)}><Icon name={onTeam ? "close" : "plus"} size={12} />{onTeam ? "On your team" : "Add to team"}</button>
                 </div>;
               })}
             </div>
             <div className="leaderboard-source">Ranked by {leaderboardConfig[leaderboardPosition].metric} · Stats checked {statsCheckedAt} · Snapshot does not update automatically · <a href={leaderboardConfig[leaderboardPosition].sourceUrl} target="_blank" rel="noreferrer">StatMuse source</a></div>
+            <div className="rating-explanation">Site ratings compare 2026 position-specific yardage: the top fifth earns 5 stars and the bottom fifth earns 1. They are separate from your personal ratings. Players without 2026 stats are marked unrated.</div>
           </section>
           <div className="directory-toolbar-title"><div className="eyebrow">Search the player pool</div><span>{players.length} players · Add any result to your team</span></div>
           <div className="section-toolbar">
@@ -772,6 +793,7 @@ export default function Home() {
             </div>
             <div className="player-top"><div className="player-avatar">{player.initials}</div><div><button className="player-name player-name-link" onClick={() => openPlayer(player)}>{player.name}</button><div className="player-team">{player.number === "—" ? player.team : `#${player.number} · ${player.team}`}</div></div><span className="position-tag">{player.position}</span></div>
             <div className="player-stats">{playerStatRows(player).map(stat => <div className="player-stat" key={stat.label}><span>{stat.label}</span><b>{stat.value}</b></div>)}</div>
+            <SiteRatingDisplay rating={siteRatings[player.id] ?? null} position={player.position} />
             <div className="player-rating" role="group" aria-label={`Your rating for ${player.name}`}>
               <span>Your rating</span>{[1, 2, 3, 4, 5].map(star => <button key={star} aria-label={`Rate ${player.name} ${star} out of 5`} aria-pressed={(playerRatings[player.id] || 0) === star} onClick={() => setRating(player.id, star)} className={(playerRatings[player.id] || 0) >= star ? "rated" : ""}><Icon name="star" size={13} /></button>)}
               {playerRatings[player.id] ? <b>{playerRatings[player.id]}/5</b> : <b>—</b>}
@@ -818,6 +840,7 @@ export default function Home() {
       <div className="notice">{playerDetail.positionRank ? `2026 position-ranking snapshot from StatMuse, checked ${statsCheckedAt}. Rankings do not update automatically.` : `2026 regular-season stats from NFL.com, checked ${statsCheckedAt}. This saved snapshot does not update automatically. A player with no line is shown without invented zero statistics.`}</div>
       <div className="detail-profile"><div className="player-avatar">{playerDetail.initials}</div><div><div className="detail-grade">2026 regular season <b>{playerDetail.games ? `${playerDetail.games} games` : "No stats"}</b></div><div className="section-sub">{primaryStat(playerDetail).label}: {primaryStat(playerDetail).value}</div></div></div>
       <div className="player-stats">{playerStatRows(playerDetail).map(stat => <div className="player-stat" key={stat.label}><span>{stat.label}</span><b>{stat.value}</b></div>)}</div>
+      <SiteRatingDisplay rating={siteRatings[playerDetail.id] ?? null} position={playerDetail.position} />
       <a href={playerDetail.statsUrl} target="_blank" rel="noreferrer" className="section-sub">{playerDetail.positionRank ? "Open the position ranking source" : `View ${playerDetail.name}'s NFL.com stats`}</a>
       <div className="detail-note"><div className="eyebrow">{playerDetail.positionRank ? "2026 position rank" : "Illustrative film cue"}</div><p>{playerDetail.positionRank ? `#${playerDetail.positionRank} by ${leaderboardConfig[playerDetail.position as LeaderboardPosition].metric}.` : playerDetail.note}</p></div>
       <div className="player-rating detail-rating" role="group" aria-label={`Your rating for ${playerDetail.name}`}><span>Your rating</span>{[1, 2, 3, 4, 5].map(star => <button key={star} aria-label={`Rate ${playerDetail.name} ${star} out of 5`} aria-pressed={(playerRatings[playerDetail.id] || 0) === star} onClick={() => setRating(playerDetail.id, star)} className={(playerRatings[playerDetail.id] || 0) >= star ? "rated" : ""}><Icon name="star" size={14} /></button>)}<b>{playerRatings[playerDetail.id] ? `${playerRatings[playerDetail.id]}/5` : "Not rated"}</b></div>
