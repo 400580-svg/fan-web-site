@@ -20,6 +20,7 @@ import {
 import { calculate2026SiteRatings } from "@/lib/player-ratings";
 import type { PlayerProfile } from "@/lib/player-directory";
 import type { OpenGame, PublicGame } from "@/lib/game-server";
+import DriveSimulation from "./DriveSimulation";
 
 type Props = {
   players: PlayerProfile[];
@@ -71,6 +72,7 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn }: Pr
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [settledPlayKey, setSettledPlayKey] = useState("");
   const siteRatings = useMemo(() => calculate2026SiteRatings(players), [players]);
   const rosterError = validateGameRoster(rosterIds, players);
 
@@ -224,6 +226,19 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn }: Pr
   };
 
   const currentState = mode === "bot" ? botGame : onlineGame?.state || null;
+  const currentPlayKey = currentState?.lastDrive
+    ? `${mode}-${mode === "online" ? onlineGame?.id || "match" : "bot"}-${currentState.history.length}-${currentState.lastDrive.offense}-${currentState.lastDrive.offenseCall}-${currentState.lastDrive.defenseCall}-${currentState.lastDrive.yards}`
+    : "";
+  const isSimulating = Boolean(currentPlayKey && currentPlayKey !== settledPlayKey);
+  useEffect(() => {
+    if (!currentPlayKey) {
+      setSettledPlayKey("");
+      return;
+    }
+    const playKey = currentPlayKey;
+    const timer = window.setTimeout(() => setSettledPlayKey(playKey), 1800);
+    return () => window.clearTimeout(timer);
+  }, [currentPlayKey]);
   const currentStatus = mode === "bot"
     ? botGame && botGame.drivesCompleted >= drivesPerGame ? "complete" : botGame ? "active" : "none"
     : onlineGame?.status || "none";
@@ -291,12 +306,13 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn }: Pr
 
     {mode === "bot" && currentStatus !== "none" && currentState && <section className="game-match-panel">
       {renderScoreboard(currentState)}
+      <DriveSimulation state={currentState} players={players} isAnimating={isSimulating} />
       {currentStatus === "complete"
         ? <div className="game-result"><div className="eyebrow">Final score</div><h3>{winnerText}</h3><p>{currentState.homeScore}–{currentState.awayScore} after {drivesPerGame} drives.</p><button className="primary-button" onClick={() => { setBotGame(null); setError(""); }}>Start another game</button></div>
         : <div className="game-call-area">
           <div className="game-call-title"><span className="game-turn-kicker">DRIVE {currentState.drivesCompleted + 1}</span><h3>{role === "offense" ? "Your team has the ball." : "You’re setting the defense."}</h3><p>{role === "offense" ? "Choose an offensive call. The bot will answer with a defensive look." : "Choose a defensive call. The bot will select an offensive play."}</p></div>
           <div className="game-call-grid">
-            {(role === "offense" ? offenseOptions : defenseOptions).map(option => <button className="game-call-card" key={option.value} onClick={() => callBotPlay(option.value)}><span className="game-call-icon"><i /></span><b>{option.label}</b><small>{option.detail}</small><span className="game-call-arrow">CALL PLAY →</span></button>)}
+            {(role === "offense" ? offenseOptions : defenseOptions).map(option => <button className="game-call-card" key={option.value} disabled={isSimulating} onClick={() => callBotPlay(option.value)}><span className="game-call-icon"><i /></span><b>{option.label}</b><small>{option.detail}</small><span className="game-call-arrow">CALL PLAY →</span></button>)}
           </div>
         </div>}
       <DriveFeed history={currentState.history} players={players} teamLabel={teamLabel} />
@@ -309,13 +325,14 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn }: Pr
         ? <div className="game-waiting"><div className="game-waiting-icon"><i /></div><div><div className="eyebrow">Open challenge</div><h3>Waiting for another fan</h3><p>Your five-player lineup is saved. Signed-in players can join from the open matches list.</p><div className="game-waiting-lineup">{renderRosterNames(onlineGame.homeRoster)}</div></div><button className="secondary-button" disabled={busy} onClick={() => void cancelOnlineGame()}>Cancel match</button></div>
         : onlineGame.state && <>
           {renderScoreboard(onlineGame.state)}
+          <DriveSimulation state={onlineGame.state} players={players} isAnimating={isSimulating} />
           {onlineGame.status === "complete"
             ? <div className="game-result"><div className="eyebrow">Final score</div><h3>{winnerText}</h3><p>{onlineGame.state.homeScore}–{onlineGame.state.awayScore} after {drivesPerGame} drives.</p><button className="primary-button" onClick={() => { setOnlineGame(null); setMessage(""); }}>Find another match</button></div>
             : <div className="game-call-area">
-              <div className="game-call-title"><span className="game-turn-kicker">DRIVE {onlineGame.state.drivesCompleted + 1} · {onlineGame.myRole?.toUpperCase()}</span><h3>{onlineGame.myMoveSubmitted ? "Your call is locked in." : onlineGame.myRole === "offense" ? "Your team has the ball." : "You’re setting the defense."}</h3><p>{onlineGame.myMoveSubmitted ? "Waiting for the other player to make their call." : onlineGame.myRole === "offense" ? "Choose the offensive play for this drive." : "Choose the defensive look for this drive."}</p></div>
+              <div className="game-call-title"><span className="game-turn-kicker">DRIVE {onlineGame.state.drivesCompleted + 1} · {onlineGame.myRole?.toUpperCase()}</span><h3>{isSimulating ? "Watch the play unfold." : onlineGame.myMoveSubmitted ? "Your call is locked in." : onlineGame.myRole === "offense" ? "Your team has the ball." : "You’re setting the defense."}</h3><p>{isSimulating ? "The ball is live. The result will appear in the drive log." : onlineGame.myMoveSubmitted ? "Waiting for the other player to make their call." : onlineGame.myRole === "offense" ? "Choose the offensive play for this drive." : "Choose the defensive look for this drive."}</p></div>
               {onlineGame.myMoveSubmitted
                 ? <div className="game-waiting-opponent"><span className="game-live-dot" /> Waiting for opponent’s call…</div>
-                : <div className="game-call-grid">{(onlineGame.myRole === "offense" ? offenseOptions : defenseOptions).map(option => <button className="game-call-card" key={option.value} disabled={busy} onClick={() => void submitOnlineCall(option.value)}><span className="game-call-icon"><i /></span><b>{option.label}</b><small>{option.detail}</small><span className="game-call-arrow">CALL PLAY →</span></button>)}</div>}
+                : <div className="game-call-grid">{(onlineGame.myRole === "offense" ? offenseOptions : defenseOptions).map(option => <button className="game-call-card" key={option.value} disabled={busy || isSimulating} onClick={() => void submitOnlineCall(option.value)}><span className="game-call-icon"><i /></span><b>{option.label}</b><small>{option.detail}</small><span className="game-call-arrow">CALL PLAY →</span></button>)}</div>}
               <button className="game-leave-button" disabled={busy} onClick={() => void leaveOnlineGame()}>Leave this match</button>
             </div>}
           <DriveFeed history={onlineGame.state.history} players={players} teamLabel={teamLabel} />
@@ -332,7 +349,7 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn }: Pr
 
     {error && currentStatus !== "none" && <div className="game-error" role="alert">{error}</div>}
     {message && <p className="game-status-message" role="status">{message}</p>}
-    <p className="game-rules-note">Quick simulation: each of six drives is resolved from the call matchup and the selected 2026 player ratings. A touchdown is 7 points; a field goal is 3. Bot games run in this tab; online games save turns and scores to your account.</p>
+    <p className="game-rules-note">Watch each play unfold on the field, then use the result to set up the next drive. The six-drive simulation uses your selected 2026 player ratings; touchdowns score 7 and field goals score 3. Bot games run in this tab; online games save turns and scores to your account.</p>
   </section>;
 }
 

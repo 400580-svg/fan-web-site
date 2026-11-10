@@ -482,6 +482,50 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .dark-mode .current-team-empty { border-color: #2b5066; background: #101c2b; }
 .dark-mode .current-team-empty p { color: #9eb1c1; }
 
+.drive-simulation { margin: 15px 0 3px; padding: 13px 15px 10px; overflow: hidden; border: 1px solid #263d52; border-radius: 7px; color: #edf4f8; background: linear-gradient(145deg,#14263a,#101a29); }
+.drive-sim-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 2px 10px; }
+.drive-sim-kicker { display: flex; align-items: center; gap: 7px; color: #9bb1c1; font: 600 8px var(--font-mono); letter-spacing: 1px; }
+.drive-sim-kicker i { width: 7px; height: 7px; border-radius: 50%; background: #48d39b; box-shadow: 0 0 0 3px rgba(72,211,155,.15); }
+.drive-sim-head h3 { margin: 5px 0 0; color: #f3f7fa; font: 700 20px/.95 var(--font-display); }
+.drive-sim-head h3 span { color: #9bb1c1; font-size: 11px; }
+.drive-sim-possession { display: grid; gap: 4px; text-align: right; }
+.drive-sim-possession small { color: #94aabd; font: 600 8px var(--font-mono); letter-spacing: .8px; }
+.drive-sim-possession b { color: var(--gold); font: 700 14px var(--font-display); text-transform: uppercase; }
+.drive-field-wrap { padding: 4px; border: 1px solid rgba(195,226,209,.2); border-radius: 5px; background: #0d503b; }
+.drive-field { width: 100%; height: auto; display: block; overflow: visible; }
+.field-yard-number { fill: rgba(236,255,243,.72); font: 600 12px var(--font-mono); }
+.field-endzone { fill: rgba(255,255,255,.73); font: 700 13px var(--font-mono); letter-spacing: 2px; text-anchor: middle; dominant-baseline: middle; }
+.field-line-scrimmage { stroke: #bdeeff; stroke-width: 2; stroke-dasharray: 6 4; }
+.field-line-firstdown { stroke: #ffc20e; stroke-width: 2; stroke-dasharray: 5 4; }
+.field-line-label { fill: #d9f4ff; font: 600 8px var(--font-mono); text-anchor: middle; }
+.field-line-label.first-down { fill: #ffe28a; }
+.field-pass-arc { fill: none; stroke: rgba(255,194,14,.8); stroke-width: 2; stroke-dasharray: 5 5; opacity: 0; }
+.sim-token { transform-box: fill-box; transform-origin: center; }
+.sim-token-disc { stroke: rgba(255,255,255,.92); stroke-width: 2; }
+.sim-offense-disc { fill: #087fbd; }
+.sim-defense-disc { fill: #ffc20e; }
+.sim-token-label { fill: white; font: 700 9px var(--font-mono); }
+.sim-defense-label { fill: #453400; font-size: 8px; }
+.sim-ball { opacity: .8; transform-box: fill-box; transform-origin: center; }
+.drive-simulation.is-animating.play-quick_pass .field-pass-arc,.drive-simulation.is-animating.play-deep_pass .field-pass-arc { opacity: 1; animation: pass-arc-show 1.5s ease-out both; }
+.drive-simulation.is-animating .sim-dl1,.drive-simulation.is-animating .sim-dl2,.drive-simulation.is-animating .sim-dl3,.drive-simulation.is-animating .sim-dl4,.drive-simulation.is-animating .sim-lb1,.drive-simulation.is-animating .sim-lb2 { animation: defense-close 1.25s ease-in-out both; }
+.drive-simulation.is-animating.play-run .sim-rb { animation: run-break 1.45s cubic-bezier(.15,.75,.35,1) both; }
+.drive-simulation.is-animating.play-run .sim-ball { animation: ball-run 1.25s ease-in-out both; }
+.drive-simulation.is-animating.play-quick_pass .sim-wr1,.drive-simulation.is-animating.play-quick_pass .sim-te { animation: quick-route 1.35s ease-out both; }
+.drive-simulation.is-animating.play-quick_pass .sim-ball,.drive-simulation.is-animating.play-deep_pass .sim-ball { animation: ball-pass 1.3s cubic-bezier(.15,.65,.3,1) both; }
+.drive-simulation.is-animating.play-deep_pass .sim-wr2 { animation: deep-route 1.55s ease-out both; }
+@keyframes run-break { 0% { translate: 0 0; } 45% { translate: var(--gain-mid) -4px; } 100% { translate: var(--gain) 0; } }
+@keyframes quick-route { 0% { translate: 0 0; } 35% { translate: 22px -16px; } 100% { translate: var(--gain) var(--target-y); } }
+@keyframes deep-route { 0% { translate: 0 0; } 35% { translate: 64px -8px; } 100% { translate: var(--gain) var(--target-y); } }
+@keyframes defense-close { 0% { translate: 0 0; } 100% { translate: -25px 0; } }
+@keyframes ball-run { 0% { translate: 0 0; } 100% { translate: var(--gain) 0; } }
+@keyframes ball-pass { 0% { translate: 0 0; opacity: .7; } 55% { translate: var(--gain-late) var(--target-y-mid); opacity: 1; } 100% { translate: var(--gain) var(--target-y); opacity: 1; } }
+@keyframes pass-arc-show { 0% { opacity: 0; } 20%,80% { opacity: .9; } 100% { opacity: .2; } }
+.drive-sim-bottom { padding: 8px 2px 3px; display: flex; align-items: center; justify-content: space-between; gap: 9px; }
+.drive-sim-state { color: var(--gold); font: 600 8px var(--font-mono); letter-spacing: .7px; }
+.drive-sim-roster { overflow: hidden; color: #9bb1c1; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.drive-sim-announcement { min-height: 17px; margin: 3px 2px 0; color: #c7d6e1; font-size: 9px; line-height: 1.5; }
+
 .game-center { padding-bottom: 30px; }
 .game-heading { align-items: end; }
 .game-heading h2 { margin: 4px 0 2px; }
@@ -643,4 +687,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .my-team-position-count { min-height: 55px; padding: 8px; flex-direction: column; justify-content: center; gap: 5px; }
   .my-team-position-count b { font-size: 21px; }
   .my-team-group > header h3 { font-size: 19px; }
+  .drive-simulation { padding: 10px 8px 8px; }
+  .field-yard-number { font-size: 14px; }
+  .field-endzone { font-size: 11px; }
+  .drive-sim-head h3 { font-size: 17px; }
+  .drive-sim-head h3 span { font-size: 9px; }
+  .drive-sim-roster { max-width: 50%; }
 }
