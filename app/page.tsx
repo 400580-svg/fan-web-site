@@ -237,6 +237,7 @@ function Icon({ name, size = 18 }: { name: string; size?: number }) {
     trash: "M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6",
     bell: "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4",
     shield: "M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11z",
+    bolt: "M13 2 4 14h6l-1 8 11-12h-6l2-8z",
     trend: "M3 17l6-6 4 4 8-8m-6 0h6v6"
   };
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name] || paths.grid} /></svg>;
@@ -681,7 +682,7 @@ export default function Home() {
 
   return <div className={`app-shell ${darkMode ? "dark-mode" : ""}`}>
     <aside className="sidebar">
-      <div className="brand"><div className="brand-mark"><Icon name="shield" size={21} /></div><div className="brand-name">GRIDIRON<span>CENTRAL</span></div></div>
+      <div className="brand"><div className="brand-mark"><Icon name="bolt" size={22} /></div><div className="brand-name">GRIDIRON<span>CENTRAL</span></div></div>
       <div className="side-label">Game center</div>
       <nav className="nav-list" aria-label="Main navigation">
         {navItems.map(item => <button key={item.title} className={`nav-item ${view === item.title ? "active" : ""}`} onClick={() => goto(item.title)} aria-current={view === item.title ? "page" : undefined}><span className="nav-icon"><Icon name={item.icon} size={17} /></span>{item.title}</button>)}
