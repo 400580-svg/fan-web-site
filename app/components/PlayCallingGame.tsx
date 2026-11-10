@@ -8,8 +8,9 @@ import {
   counterOffense,
   createGameState,
   drivesPerGame,
+  playsPerDrive,
   getRecommendedRoster,
-  resolveDrive,
+  resolvePlay,
   rosterSlots,
   validateGameRoster,
   type DefensiveCall,
@@ -120,7 +121,7 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn }: Pr
         ? counterDefense(call as OffensiveCall)
         : allDefensiveCalls[Math.floor(Math.random() * allDefensiveCalls.length)]
       : call as DefensiveCall;
-    setBotGame(current => current ? resolveDrive(current, players, offenseCall, defenseCall) : current);
+    setBotGame(current => current ? resolvePlay(current, players, offenseCall, defenseCall) : current);
     setError("");
   };
 
@@ -209,7 +210,7 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn }: Pr
     try {
       const data = await apiRequest<{ game: PublicGame }>(`/api/games/${onlineGame.id}`, {
         method: "POST",
-        body: JSON.stringify({ action: "call", call, drive: onlineGame.state?.drivesCompleted })
+        body: JSON.stringify({ action: "call", call, play: onlineGame.state?.history.length })
       });
       setOnlineGame(data.game);
     } catch (requestError) {
@@ -259,7 +260,7 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn }: Pr
   const renderScoreboard = (state: GameState | Omit<GameState, "pending">) => (
     <div className="game-scoreboard">
       <div className={`game-score-side ${mySide === "home" ? "is-you" : ""}`}><span>{teamLabel("home")}</span><strong>{state.homeScore}</strong><small>{renderRosterNames(state.homeRoster)}</small></div>
-      <div className="game-score-center"><span>DRIVE</span><b>{Math.min(state.drivesCompleted + 1, drivesPerGame)}<i> / {drivesPerGame}</i></b><small>{state.drivesCompleted >= drivesPerGame ? "FINAL" : "TURN-BASED"}</small></div>
+      <div className="game-score-center"><span>POSSESSION</span><b>{Math.min(isSimulating && state.lastDrive?.possessionEnded ? state.lastDrive.driveNumber : state.drivesCompleted + 1, drivesPerGame)}<i> / {drivesPerGame}</i></b><small>{state.drivesCompleted >= drivesPerGame ? "FINAL" : `PLAY ${Math.min(isSimulating && state.lastDrive ? state.lastDrive.playNumber : state.playsInDrive + 1, playsPerDrive)} / ${playsPerDrive}`}</small></div>
       <div className={`game-score-side ${mySide === "away" ? "is-you" : ""}`}><span>{teamLabel("away")}</span><strong>{state.awayScore}</strong><small>{renderRosterNames(state.awayRoster)}</small></div>
     </div>
   );
@@ -267,7 +268,7 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn }: Pr
   return <section className="section-layout game-center">
     <div className="section-head game-heading">
       <div><div className="eyebrow">Turn-based football</div><h2>Game day</h2><div className="section-sub">Pick five 2026 players, call the offense or defense, and compete for the final score.</div></div>
-      <span className="panel-tag"><span className="game-live-dot" /> SIX-DRIVE MATCH</span>
+      <span className="panel-tag"><span className="game-live-dot" /> SIX-POSSESSION MATCH</span>
     </div>
 
     <div className="game-mode-switch" role="tablist" aria-label="Choose an opponent">
@@ -308,9 +309,9 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn }: Pr
       {renderScoreboard(currentState)}
       <DriveSimulation state={currentState} players={players} isAnimating={isSimulating} />
       {currentStatus === "complete"
-        ? <div className="game-result"><div className="eyebrow">Final score</div><h3>{winnerText}</h3><p>{currentState.homeScore}–{currentState.awayScore} after {drivesPerGame} drives.</p><button className="primary-button" onClick={() => { setBotGame(null); setError(""); }}>Start another game</button></div>
+        ? <div className="game-result"><div className="eyebrow">Final score</div><h3>{winnerText}</h3><p>{currentState.homeScore}–{currentState.awayScore} after {drivesPerGame} possessions.</p><button className="primary-button" onClick={() => { setBotGame(null); setError(""); }}>Start another game</button></div>
         : <div className="game-call-area">
-          <div className="game-call-title"><span className="game-turn-kicker">DRIVE {currentState.drivesCompleted + 1}</span><h3>{role === "offense" ? "Your team has the ball." : "You’re setting the defense."}</h3><p>{role === "offense" ? "Choose an offensive call. The bot will answer with a defensive look." : "Choose a defensive call. The bot will select an offensive play."}</p></div>
+          <div className="game-call-title"><span className="game-turn-kicker">POSSESSION {isSimulating && currentState.lastDrive ? currentState.lastDrive.driveNumber : currentState.drivesCompleted + 1} · PLAY {isSimulating && currentState.lastDrive ? currentState.lastDrive.playNumber : currentState.playsInDrive + 1} OF {playsPerDrive}</span><h3>{isSimulating ? "Watch the play unfold." : role === "offense" ? "Your team has the ball." : "You’re setting the defense."}</h3><p>{isSimulating ? "The ball is live. The result will appear in the play log." : role === "offense" ? "Choose a play to score. You have six plays before a turnover on downs." : "Choose a defensive call to stop the offense before it scores."}</p></div>
           <div className="game-call-grid">
             {(role === "offense" ? offenseOptions : defenseOptions).map(option => <button className="game-call-card" key={option.value} disabled={isSimulating} onClick={() => callBotPlay(option.value)}><span className="game-call-icon"><i /></span><b>{option.label}</b><small>{option.detail}</small><span className="game-call-arrow">CALL PLAY →</span></button>)}
           </div>
@@ -327,9 +328,9 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn }: Pr
           {renderScoreboard(onlineGame.state)}
           <DriveSimulation state={onlineGame.state} players={players} isAnimating={isSimulating} />
           {onlineGame.status === "complete"
-            ? <div className="game-result"><div className="eyebrow">Final score</div><h3>{winnerText}</h3><p>{onlineGame.state.homeScore}–{onlineGame.state.awayScore} after {drivesPerGame} drives.</p><button className="primary-button" onClick={() => { setOnlineGame(null); setMessage(""); }}>Find another match</button></div>
+            ? <div className="game-result"><div className="eyebrow">Final score</div><h3>{winnerText}</h3><p>{onlineGame.state.homeScore}–{onlineGame.state.awayScore} after {drivesPerGame} possessions.</p><button className="primary-button" onClick={() => { setOnlineGame(null); setMessage(""); }}>Find another match</button></div>
             : <div className="game-call-area">
-              <div className="game-call-title"><span className="game-turn-kicker">DRIVE {onlineGame.state.drivesCompleted + 1} · {onlineGame.myRole?.toUpperCase()}</span><h3>{isSimulating ? "Watch the play unfold." : onlineGame.myMoveSubmitted ? "Your call is locked in." : onlineGame.myRole === "offense" ? "Your team has the ball." : "You’re setting the defense."}</h3><p>{isSimulating ? "The ball is live. The result will appear in the drive log." : onlineGame.myMoveSubmitted ? "Waiting for the other player to make their call." : onlineGame.myRole === "offense" ? "Choose the offensive play for this drive." : "Choose the defensive look for this drive."}</p></div>
+              <div className="game-call-title"><span className="game-turn-kicker">POSSESSION {isSimulating && onlineGame.state.lastDrive ? onlineGame.state.lastDrive.driveNumber : onlineGame.state.drivesCompleted + 1} · PLAY {isSimulating && onlineGame.state.lastDrive ? onlineGame.state.lastDrive.playNumber : onlineGame.state.playsInDrive + 1} OF {playsPerDrive} · {onlineGame.myRole?.toUpperCase()}</span><h3>{isSimulating ? "Watch the play unfold." : onlineGame.myMoveSubmitted ? "Your call is locked in." : onlineGame.myRole === "offense" ? "Your team has the ball." : "You’re setting the defense."}</h3><p>{isSimulating ? "The ball is live. The result will appear in the play log." : onlineGame.myMoveSubmitted ? "Waiting for the other player to make their call." : onlineGame.myRole === "offense" ? "Choose a play to score. You have six plays before a turnover on downs." : "Choose a defensive call to stop the offense before it scores."}</p></div>
               {onlineGame.myMoveSubmitted
                 ? <div className="game-waiting-opponent"><span className="game-live-dot" /> Waiting for opponent’s call…</div>
                 : <div className="game-call-grid">{(onlineGame.myRole === "offense" ? offenseOptions : defenseOptions).map(option => <button className="game-call-card" key={option.value} disabled={busy || isSimulating} onClick={() => void submitOnlineCall(option.value)}><span className="game-call-icon"><i /></span><b>{option.label}</b><small>{option.detail}</small><span className="game-call-arrow">CALL PLAY →</span></button>)}</div>}
@@ -349,7 +350,7 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn }: Pr
 
     {error && currentStatus !== "none" && <div className="game-error" role="alert">{error}</div>}
     {message && <p className="game-status-message" role="status">{message}</p>}
-    <p className="game-rules-note">Watch each play unfold on the field, then use the result to set up the next drive. The six-drive simulation uses your selected 2026 player ratings; touchdowns score 7 and field goals score 3. Bot games run in this tab; online games save turns and scores to your account.</p>
+    <p className="game-rules-note">Player ratings influence each play’s yards. Every possession gives the offense up to six plays to score: a touchdown scores 7, and reaching field-goal range by play six earns 3. Otherwise, the ball turns over on downs. Matches last six possessions total. Bot games run in this tab; online games save every play and score to your account.</p>
   </section>;
 }
 
@@ -365,12 +366,12 @@ function DriveFeed({
   if (!history.length) return null;
   const callName: Record<OffensiveCall, string> = { run: "Inside run", quick_pass: "Quick pass", deep_pass: "Deep shot" };
   const defenseName: Record<DefensiveCall, string> = { stack_box: "Stacked box", zone: "Zone", blitz: "Blitz" };
-  return <section className="game-drive-feed" aria-label="Drive-by-drive play log">
-    <div className="game-feed-heading"><div><div className="eyebrow">Play-by-play</div><h3>Drive log</h3></div><span>{history.length} / {drivesPerGame}</span></div>
+  return <section className="game-drive-feed" aria-label="Play-by-play game log">
+    <div className="game-feed-heading"><div><div className="eyebrow">Play-by-play</div><h3>Play log</h3></div><span>{history.length} PLAYS</span></div>
     {history.map((drive, index) => <article className="game-drive-row" key={`${index}-${drive.offense}-${drive.yards}`}>
-      <span className="game-drive-number">{String(index + 1).padStart(2, "0")}</span>
-      <div><b>{teamLabel(drive.offense)} · {callName[drive.offenseCall]} vs {defenseName[drive.defenseCall]}</b><small>{drive.message} {drive.yards > 0 ? `${drive.yards} yards.` : ""}</small></div>
-      <strong className={drive.points ? "scored" : ""}>{drive.points ? `+${drive.points}` : "—"}</strong>
+      <span className="game-drive-number">{String(drive.driveNumber || index + 1).padStart(2, "0")}.{drive.playNumber || 1}</span>
+      <div><b>{teamLabel(drive.offense)} · {callName[drive.offenseCall]} vs {defenseName[drive.defenseCall]}</b><small>{drive.message}{drive.possessionEnded && drive.yards > 0 ? ` Last play: ${drive.yards} yards.` : ""}</small></div>
+      <strong className={drive.points ? "scored" : ""}>{drive.points ? `+${drive.points}` : drive.turnoverOnDowns ? "TO" : "—"}</strong>
     </article>)}
   </section>;
 }

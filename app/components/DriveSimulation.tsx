@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { GameState } from "@/lib/game-engine";
+import { drivesPerGame, playsPerDrive, type GameState } from "@/lib/game-engine";
 import type { PlayerProfile } from "@/lib/player-directory";
 
 type Props = {
@@ -33,20 +33,28 @@ const defenseTokens = [
 
 export default function DriveSimulation({ state, players, isAnimating }: Props) {
   const lastDrive = state.lastDrive;
-  const offenseSide = lastDrive?.offense || state.currentOffense;
+  const lastPlayEnded = lastDrive ? lastDrive.possessionEnded ?? true : false;
+  const isFinal = state.drivesCompleted >= drivesPerGame;
+  const offenseSide = lastDrive && (isAnimating || !lastPlayEnded || isFinal) ? lastDrive.offense : state.currentOffense;
   const offenseIds = offenseSide === "home" ? state.homeRoster : state.awayRoster;
   const offensePlayerNames = useMemo(() => offenseIds.map(id => players.find(player => player.id === id)?.name || "Player"), [offenseIds, players]);
   const callClass = lastDrive ? `play-${lastDrive.offenseCall}` : "play-opening";
   const yards = lastDrive?.yards || 0;
   const gain = Math.max(-110, Math.min(190, yards * 5));
   const targetY = lastDrive?.offenseCall === "deep_pass" ? -68 : lastDrive?.offenseCall === "quick_pass" ? -38 : 0;
+  const possessionNumber = isAnimating && lastDrive?.possessionEnded
+    ? lastDrive.driveNumber
+    : Math.min(state.drivesCompleted + 1, drivesPerGame);
+  const playNumber = (isAnimating || isFinal) && lastDrive
+    ? lastDrive.playNumber
+    : Math.min(state.playsInDrive + 1, playsPerDrive);
   const callLabel = lastDrive
     ? lastDrive.offenseCall === "run" ? "Inside run"
       : lastDrive.offenseCall === "quick_pass" ? "Quick pass"
         : "Deep shot"
     : "Opening drive";
   const announcement = lastDrive
-    ? `${callLabel}: ${lastDrive.yards > 0 ? `${lastDrive.yards} yards. ` : ""}${lastDrive.message}`
+    ? `${callLabel}: ${lastDrive.possessionEnded && lastDrive.yards > 0 ? `${lastDrive.yards} yards on the final play. ` : ""}${lastDrive.message}`
     : "Choose a play call to start the simulation.";
 
   return <section className={`drive-simulation ${callClass} ${offenseSide === "away" ? "away-on-offense" : ""} ${isAnimating ? "is-animating" : ""}`} style={{
@@ -58,7 +66,7 @@ export default function DriveSimulation({ state, players, isAnimating }: Props) 
   } as React.CSSProperties} aria-label="Animated football play simulation">
     <div className="drive-sim-head">
       <div><span className="drive-sim-kicker"><i /> LIVE GAME SIMULATION</span><h3>{offenseSide === "home" ? "HOME" : "AWAY"} <span>ON OFFENSE</span></h3></div>
-      <div className="drive-sim-possession"><small>DRIVE {Math.min(state.drivesCompleted + (lastDrive ? 0 : 1), 6)} / 6</small><b>{callLabel}</b></div>
+      <div className="drive-sim-possession"><small>POSSESSION {possessionNumber} / {drivesPerGame} · PLAY {playNumber} / {playsPerDrive}</small><b>{callLabel}</b></div>
     </div>
     <div className="drive-field-wrap">
       <svg className="drive-field" viewBox="0 0 900 320" role="img" aria-label={`Football field showing ${callLabel.toLowerCase()}${lastDrive ? ` for ${lastDrive.yards} yards` : ""}`}>
@@ -99,7 +107,7 @@ export default function DriveSimulation({ state, players, isAnimating }: Props) 
       </svg>
     </div>
     <div className="drive-sim-bottom">
-      <span className="drive-sim-state">{isAnimating ? "PLAY IN MOTION" : lastDrive ? `${lastDrive.yards} YARDS · ${lastDrive.points ? `${lastDrive.points} POINTS` : "NO SCORE"}` : "READY FOR THE SNAP"}</span>
+      <span className="drive-sim-state">{isAnimating ? "PLAY IN MOTION" : lastDrive ? `PLAY ${lastDrive.playNumber || 1} · ${lastDrive.driveYards ?? lastDrive.yards} DRIVE YARDS · ${lastDrive.points ? `${lastDrive.points} POINTS` : lastPlayEnded ? "POSSESSION OVER" : `${playsPerDrive - state.playsInDrive} PLAYS LEFT`}` : "READY FOR THE SNAP"}</span>
       <span className="drive-sim-roster" title={offensePlayerNames.join(", ")}>{offensePlayerNames.slice(0, 3).join(" · ")}{offensePlayerNames.length > 3 ? " +" : ""}</span>
     </div>
     <p className="drive-sim-announcement" aria-live="polite">{isAnimating ? `Ball snapped — ${callLabel.toLowerCase()} in motion.` : announcement}</p>

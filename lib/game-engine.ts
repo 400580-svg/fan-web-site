@@ -3,18 +3,24 @@ import type { PlayerProfile } from "@/lib/player-directory";
 
 export const rosterSlots = ["QB", "RB", "WR", "WR", "TE"] as const;
 export const drivesPerGame = 6;
+export const playsPerDrive = 6;
 
 export type GameSide = "home" | "away";
 export type OffensiveCall = "run" | "quick_pass" | "deep_pass";
 export type DefensiveCall = "stack_box" | "zone" | "blitz";
 export type GameCall = OffensiveCall | DefensiveCall;
 
-export type DriveSummary = {
+export type PlaySummary = {
+  driveNumber: number;
+  playNumber: number;
   offense: GameSide;
   offenseCall: OffensiveCall;
   defenseCall: DefensiveCall;
   yards: number;
+  driveYards: number;
   points: 0 | 3 | 7;
+  possessionEnded: boolean;
+  turnoverOnDowns: boolean;
   message: string;
 };
 
@@ -25,13 +31,37 @@ export type GameState = {
   awayScore: number;
   currentOffense: GameSide;
   drivesCompleted: number;
+  playsInDrive: number;
+  yardsOnDrive: number;
   pending: {
     offense: OffensiveCall | null;
     defense: DefensiveCall | null;
   };
-  lastDrive: DriveSummary | null;
-  history: DriveSummary[];
+  lastDrive: PlaySummary | null;
+  history: PlaySummary[];
 };
+
+export function normalizeGameState(state: GameState): GameState {
+  const normalizeSummary = (summary: PlaySummary, index: number): PlaySummary => ({
+    ...summary,
+    driveNumber: Number.isInteger(summary.driveNumber) ? summary.driveNumber : index + 1,
+    playNumber: Number.isInteger(summary.playNumber) ? summary.playNumber : 1,
+    driveYards: Number.isFinite(summary.driveYards) ? summary.driveYards : summary.yards,
+    possessionEnded: typeof summary.possessionEnded === "boolean" ? summary.possessionEnded : true,
+    turnoverOnDowns: typeof summary.turnoverOnDowns === "boolean" ? summary.turnoverOnDowns : false
+  });
+  const history = Array.isArray(state.history) ? state.history.map(normalizeSummary) : [];
+  return {
+    ...state,
+    playsInDrive: Number.isInteger(state.playsInDrive) ? state.playsInDrive : 0,
+    yardsOnDrive: Number.isFinite(state.yardsOnDrive) ? state.yardsOnDrive : 0,
+    pending: state.pending || { offense: null, defense: null },
+    lastDrive: state.lastDrive
+      ? normalizeSummary(state.lastDrive, Math.max(0, state.drivesCompleted - 1))
+      : null,
+    history
+  };
+}
 
 export function getRecommendedRoster(
   players: readonly PlayerProfile[],
@@ -97,6 +127,8 @@ export function createGameState(homeRoster: readonly string[], awayRoster: reado
     awayScore: 0,
     currentOffense: "home",
     drivesCompleted: 0,
+    playsInDrive: 0,
+    yardsOnDrive: 0,
     pending: { offense: null, defense: null },
     lastDrive: null,
     history: []
@@ -115,7 +147,7 @@ export function counterOffense(defenseCall: DefensiveCall): OffensiveCall {
   return "run";
 }
 
-export function resolveDrive(
+export function resolvePlay(
   state: GameState,
   players: readonly PlayerProfile[],
   offenseCall: OffensiveCall,
@@ -133,18 +165,49 @@ export function resolveDrive(
     deep_pass: { stack_box: 1, zone: -4, blitz: 3 }
   };
   const variance = Math.round((Math.max(0, Math.min(1, roll)) * 14) - 7);
-  const yards = Math.max(-5, Math.min(36, Math.round(8 + (offenseRating - defenseRating) * 2 + matchupAdvantage[offenseCall][defenseCall] + variance)));
-  const points: 0 | 3 | 7 = yards >= 24 ? 7 : yards >= 11 ? 3 : 0;
-  const message = points === 7
-    ? "Touchdown — the offense breaks through."
-    : points === 3
-      ? "Field goal — the drive reaches scoring range."
-      : yards <= 0
-        ? "Turnover — the defense wins the matchup."
-        : "Punt — the defense forces a stop.";
-  const summary: DriveSummary = { offense, offenseCall, defenseCall, yards, points, message };
-  const completed = state.drivesCompleted + 1;
-  const nextOffense: GameSide = offense === "home" ? "away" : "home";
+  const yards = Math.max(-4, Math.min(18, Math.round(4 + (offenseRating - defenseRating) * 1.2 + matchupAdvantage[offenseCall][defenseCall] + variance)));
+  const playNumber = state.playsInDrive + 1;
+  const driveYards = state.yardsOnDrive + yards;
+  let points: 0 | 3 | 7 = 0;
+  let possessionEnded = false;
+  let turnoverOnDowns = false;
+  let message: string;
+
+  if (driveYards >= 32) {
+    points = 7;
+    possessionEnded = true;
+    message = "Touchdown — the offense reaches the end zone.";
+  } else if (playNumber === playsPerDrive) {
+    possessionEnded = true;
+    if (driveYards >= 20) {
+      points = 3;
+      message = "Field goal — the offense scores on the sixth play.";
+    } else {
+      turnoverOnDowns = true;
+      message = "No score after six plays — turnover on downs.";
+    }
+  } else {
+    const remaining = playsPerDrive - playNumber;
+    message = `${yards < 0 ? `${Math.abs(yards)}-yard loss` : `${yards} yards`} — ${remaining} ${remaining === 1 ? "play" : "plays"} left to score.`;
+  }
+
+  const summary: PlaySummary = {
+    driveNumber: state.drivesCompleted + 1,
+    playNumber,
+    offense,
+    offenseCall,
+    defenseCall,
+    yards,
+    driveYards,
+    points,
+    possessionEnded,
+    turnoverOnDowns,
+    message
+  };
+  const completed = state.drivesCompleted + (possessionEnded ? 1 : 0);
+  const nextOffense: GameSide = possessionEnded
+    ? offense === "home" ? "away" : "home"
+    : offense;
 
   return {
     ...state,
@@ -152,8 +215,10 @@ export function resolveDrive(
     awayScore: state.awayScore + (offense === "away" ? points : 0),
     currentOffense: nextOffense,
     drivesCompleted: completed,
+    playsInDrive: possessionEnded ? 0 : playNumber,
+    yardsOnDrive: possessionEnded ? 0 : driveYards,
     pending: { offense: null, defense: null },
     lastDrive: summary,
-    history: [...state.history, summary].slice(-drivesPerGame)
+    history: [...state.history, summary].slice(-(drivesPerGame * playsPerDrive))
   };
 }

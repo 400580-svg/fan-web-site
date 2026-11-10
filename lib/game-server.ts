@@ -1,4 +1,4 @@
-import type { GameSide, GameState } from "@/lib/game-engine";
+import { normalizeGameState, type GameSide, type GameState } from "@/lib/game-engine";
 
 export type GameRecord = {
   id: string;
@@ -47,7 +47,8 @@ function asStringArray(value: string[] | string | null): string[] | null {
 
 export function toPublicGame(row: GameRecord, userId: string): PublicGame {
   const mySide: GameSide = row.host_user_id === userId ? "home" : "away";
-  const internalState = parseJson<GameState>(row.state);
+  const savedState = parseJson<GameState>(row.state);
+  const internalState = savedState ? normalizeGameState(savedState) : null;
   let state: Omit<GameState, "pending"> | null = null;
   let myRole: PublicGame["myRole"] = null;
   let myMoveSubmitted = false;

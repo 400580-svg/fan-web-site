@@ -5,7 +5,9 @@ import { getDbPool } from "@/lib/db";
 import {
   createGameState,
   drivesPerGame,
-  resolveDrive,
+  normalizeGameState,
+  playsPerDrive,
+  resolvePlay,
   validateGameRoster,
   type DefensiveCall,
   type GameCall,
@@ -21,7 +23,7 @@ export const dynamic = "force-dynamic";
 const callSchema = z.enum(["run", "quick_pass", "deep_pass", "stack_box", "zone", "blitz"]);
 const requestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("join"), roster: z.array(z.string().min(1).max(120)).length(5) }).strict(),
-  z.object({ action: z.literal("call"), call: callSchema, drive: z.number().int().min(0).max(drivesPerGame - 1) }).strict(),
+  z.object({ action: z.literal("call"), call: callSchema, play: z.number().int().min(0).max(drivesPerGame * playsPerDrive - 1) }).strict(),
   z.object({ action: z.literal("cancel") }).strict(),
   z.object({ action: z.literal("leave") }).strict()
 ]);
@@ -41,7 +43,7 @@ function readGameState(value: GameRecord["state"]): GameState {
   if (!parsed || typeof parsed !== "object" || !("pending" in parsed)) {
     throw new Error("Stored game state is invalid.");
   }
-  return parsed as GameState;
+  return normalizeGameState(parsed as GameState);
 }
 
 function conflict(message: string) {
@@ -176,9 +178,9 @@ export async function POST(
     }
 
     const state = readGameState(row.state);
-    if (parsed.data.drive !== state.drivesCompleted) {
+    if (parsed.data.play !== state.history.length) {
       await client.query("ROLLBACK");
-      return conflict("That drive has already advanced. Refresh the match before calling another play.");
+      return conflict("That play has already advanced. Refresh the match before calling another play.");
     }
     const mySide = row.host_user_id === userId ? "home" : "away";
     const role = state.currentOffense === mySide ? "offense" : "defense";
@@ -187,11 +189,11 @@ export async function POST(
     const defenseCalls: DefensiveCall[] = ["stack_box", "zone", "blitz"];
     if (role === "offense" && !offenseCalls.includes(call as OffensiveCall)) {
       await client.query("ROLLBACK");
-      return NextResponse.json({ error: "Choose an offensive play for this drive." }, { status: 400 });
+      return NextResponse.json({ error: "Choose an offensive play." }, { status: 400 });
     }
     if (role === "defense" && !defenseCalls.includes(call as DefensiveCall)) {
       await client.query("ROLLBACK");
-      return NextResponse.json({ error: "Choose a defensive call for this drive." }, { status: 400 });
+      return NextResponse.json({ error: "Choose a defensive call." }, { status: 400 });
     }
 
     const existing = state.pending[role];
@@ -208,7 +210,7 @@ export async function POST(
     else state.pending.defense = call as DefensiveCall;
     let status: GameRecord["status"] = "active";
     if (state.pending.offense && state.pending.defense) {
-      const nextState = resolveDrive(
+      const nextState = resolvePlay(
         state,
         seasonPlayers,
         state.pending.offense,
