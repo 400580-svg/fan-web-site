@@ -1,6 +1,6 @@
 # Gridiron Central
 
-Gridiron Central is a Next.js App Router and TypeScript fan-site prototype for NFL player exploration, head-to-head analysis, a custom playbook, lineup boards, and a simulated six-perspective film room.
+Gridiron Central is a Next.js App Router and TypeScript fan-site prototype for NFL player exploration, head-to-head analysis, a custom playbook, lineup boards, simulated football games, and saved game history.
 
 ## Run locally
 

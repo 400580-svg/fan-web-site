@@ -4,13 +4,14 @@ import { useClerk, useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import PlayerComparisonCharts from "./components/PlayerComparisonCharts";
-import { UserProgress, userProgressSchema } from "@/lib/progress";
+import { UserProgress, userProgressSchema, type SavedBotGame } from "@/lib/progress";
 import { leaderboardConfig, topTenPlayers2026, type LeaderboardPosition } from "@/lib/top-ten-2026";
 import { calculate2026SiteRatings, type SitePlayerRating } from "@/lib/player-ratings";
 import { seasonPlayers, type PlayerProfile as Player } from "@/lib/player-directory";
 import PlayCallingGame from "./components/PlayCallingGame";
+import GameHistory from "./components/GameHistory";
 
-type View = "Overview" | "Players" | "Game day" | "Matchup lab" | "Playbook" | "My Team" | "Film room";
+type View = "Overview" | "Players" | "Game day" | "Matchup lab" | "Playbook" | "My Team" | "Game history";
 type Play = { id: string; name: string; formation: string; personnel: string; concept: string; situation: string; note: string; tags?: string[] };
 type Lineup = { id: string; name: string; format: string; quarterback: string; runningBack: string; receiver: string; tightEnd: string; note: string };
 type ModalState = { kind: "play" | "lineup"; item?: Play | Lineup } | null;
@@ -83,7 +84,7 @@ const demoPlays: Play[] = [
 const demoLineups: Lineup[] = [
   { id: "l1", name: "Sunday Pressure", format: "Fantasy · PPR", quarterback: "Justin Herbert", runningBack: "Christian McCaffrey", receiver: "CeeDee Lamb", tightEnd: "Travis Kelce", note: "High-floor core with a premium receiving back." }
 ];
-const localProgressKeys = ["gc-plays", "gc-lineups", "gc-favorites", "gc-player-tags", "gc-team-players", "gc-player-ratings", "gc-theme", "gc-poll", "gc-recent-players", "gc-fan-tools"];
+const localProgressKeys = ["gc-plays", "gc-lineups", "gc-favorites", "gc-player-tags", "gc-team-players", "gc-player-ratings", "gc-theme", "gc-poll", "gc-recent-players", "gc-game-history", "gc-fan-tools"];
 function createDefaultProgress(): UserProgress {
   return {
     version: 1,
@@ -96,7 +97,8 @@ function createDefaultProgress(): UserProgress {
     darkMode: false,
     pollVotes: { chargers: 0, chiefs: 0 },
     userVote: "",
-    recentlyViewed: []
+    recentlyViewed: [],
+    gameHistory: []
   };
 }
 function readBrowserProgress(): UserProgress {
@@ -110,6 +112,7 @@ function readBrowserProgress(): UserProgress {
   const savedTheme = localStorage.getItem("gc-theme");
   const savedPoll = localStorage.getItem("gc-poll");
   const savedRecent = localStorage.getItem("gc-recent-players");
+  const savedGames = localStorage.getItem("gc-game-history");
   const savedFanTools = localStorage.getItem("gc-fan-tools");
   const previousFanTools = savedFanTools ? JSON.parse(savedFanTools) as {
     favorites?: string[];
@@ -133,7 +136,8 @@ function readBrowserProgress(): UserProgress {
       chiefs: Number(poll.votes.chiefs) || 0
     } : defaults.pollVotes,
     userVote: poll?.choice === "chargers" || poll?.choice === "chiefs" ? poll.choice : "",
-    recentlyViewed: savedRecent ? JSON.parse(savedRecent) as string[] : previousFanTools?.recent || defaults.recentlyViewed
+    recentlyViewed: savedRecent ? JSON.parse(savedRecent) as string[] : previousFanTools?.recent || defaults.recentlyViewed,
+    gameHistory: savedGames ? JSON.parse(savedGames) as SavedBotGame[] : defaults.gameHistory
   };
   const parsed = userProgressSchema.safeParse(raw);
   if (!parsed.success) throw new Error("Browser progress is not valid.");
@@ -153,7 +157,10 @@ function mergeProgress(guest: UserProgress, account: UserProgress): UserProgress
     playerTags: { ...guest.playerTags, ...account.playerTags },
     teamPlayers: [...new Set([...guest.teamPlayers, ...account.teamPlayers])],
     playerRatings: { ...guest.playerRatings, ...account.playerRatings },
-    recentlyViewed: [...new Set([...account.recentlyViewed, ...guest.recentlyViewed])].slice(0, 5)
+    recentlyViewed: [...new Set([...account.recentlyViewed, ...guest.recentlyViewed])].slice(0, 5),
+    gameHistory: mergeById(guest.gameHistory, account.gameHistory)
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+      .slice(0, 20)
   };
 }
 const experts = [
@@ -164,13 +171,6 @@ const experts = [
   { name: "The Fantasy Angle", role: "Usage lens", text: "Volume is the signal. Routes and touches in high-value areas matter more than last week's touchdown; track the role before chasing the result.", pick: "Target share" },
   { name: "The Film Room", role: "Player development lens", text: "Watch the eyes and the feet together. When the quarterback resets cleanly after the first read, the second window opens on time.", pick: "Rhythm + reset" }
 ];
-const filmPrompts = [
-  "When the defense rotates late, which receiver gets the cleanest leverage—and how does the quarterback's footwork show he saw it?",
-  "Watch the nickel after the snap: does the run fit open a cutback lane, or does the safety close it?",
-  "On third down, which route combination gives the quarterback a clear answer against a two-high shell?",
-  "Track the left tackle's first two steps. Is the edge rush winning with speed, or setting up an inside counter?"
-];
-
 function Icon({ name, size = 18 }: { name: string; size?: number }) {
   const paths: Record<string, string> = {
     grid: "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z",
@@ -179,6 +179,7 @@ function Icon({ name, size = 18 }: { name: string; size?: number }) {
     book: "M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z",
     lineup: "M3 4h18v16H3zM7 8h4M7 12h10M7 16h7M17 8h1",
     film: "M4 4h16v16H4zM8 4v4m8-4v4M8 16v4m8-4v4M4 8h16M4 16h16",
+    history: "M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5m4-2v6l4 2",
     search: "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.35-4.35",
     plus: "M12 5v14M5 12h14",
     arrow: "M5 12h14m-7-7 7 7-7 7",
@@ -248,7 +249,7 @@ export default function Home() {
   const [recentlyViewed, setRecentlyViewed] = useState<string[]>([]);
   const [playerDetail, setPlayerDetail] = useState<Player | null>(null);
   const [randomPlayerId, setRandomPlayerId] = useState("");
-  const [filmPrompt, setFilmPrompt] = useState(filmPrompts[0]);
+  const [gameHistory, setGameHistory] = useState<SavedBotGame[]>([]);
   const [playTagFilter, setPlayTagFilter] = useState("All tags");
   const bootstrappedRef = useRef(false);
   const authInitializedRef = useRef(false);
@@ -263,6 +264,7 @@ export default function Home() {
     const requestedView = new URLSearchParams(window.location.search).get("view");
     if (requestedView === "game") setView("Game day");
     else if (requestedView === "team") setView("My Team");
+    else if (requestedView === "history") setView("Game history");
   }, []);
 
   const progressSnapshot = useMemo<UserProgress>(() => ({
@@ -276,8 +278,9 @@ export default function Home() {
     darkMode,
     pollVotes,
     userVote,
-    recentlyViewed
-  }), [plays, lineups, favorites, playerTags, teamPlayers, playerRatings, darkMode, pollVotes, userVote, recentlyViewed]);
+    recentlyViewed,
+    gameHistory
+  }), [plays, lineups, favorites, playerTags, teamPlayers, playerRatings, darkMode, pollVotes, userVote, recentlyViewed, gameHistory]);
   const progressRef = useRef(progressSnapshot);
   progressRef.current = progressSnapshot;
 
@@ -292,6 +295,7 @@ export default function Home() {
     setPollVotes(progress.pollVotes);
     setUserVote(progress.userVote);
     setRecentlyViewed(progress.recentlyViewed);
+    setGameHistory(progress.gameHistory || []);
   };
 
   useEffect(() => {
@@ -417,10 +421,11 @@ export default function Home() {
       localStorage.setItem("gc-theme", darkMode ? "dark" : "light");
       localStorage.setItem("gc-poll", JSON.stringify({ votes: pollVotes, choice: userVote }));
       localStorage.setItem("gc-recent-players", JSON.stringify(recentlyViewed));
+      localStorage.setItem("gc-game-history", JSON.stringify(gameHistory));
       hasGuestProgressRef.current = JSON.stringify(progressSnapshot) !== JSON.stringify(createDefaultProgress());
     }
     catch { setToast("Browser storage is full. Changes may not persist."); }
-  }, [plays, lineups, favorites, playerTags, teamPlayers, playerRatings, darkMode, pollVotes, userVote, recentlyViewed, progressSnapshot, ready, isLoaded, isSignedIn]);
+  }, [plays, lineups, favorites, playerTags, teamPlayers, playerRatings, darkMode, pollVotes, userVote, recentlyViewed, gameHistory, progressSnapshot, ready, isLoaded, isSignedIn]);
 
   useEffect(() => {
     if (!ready || !isLoaded || !isSignedIn || !accountUserId || !cloudReady || cloudOwnerId !== accountUserId) return;
@@ -612,16 +617,15 @@ export default function Home() {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     setToast(`Exported ${filteredPlayers.length} player${filteredPlayers.length === 1 ? "" : "s"} to CSV.`);
   };
-  const newFilmPrompt = () => {
-    const choices = filmPrompts.filter(prompt => prompt !== filmPrompt);
-    setFilmPrompt(choices[Math.floor(Math.random() * choices.length)] || filmPrompts[0]);
+  const recordCompletedBotGame = (game: SavedBotGame) => {
+    setGameHistory(current => [game, ...current.filter(saved => saved.id !== game.id)].slice(0, 20));
   };
   const goto = (next: View) => { setView(next); setQuery(""); };
   const resource = modal?.kind === "play" ? "play" : "lineup";
   const isEditing = Boolean(modal?.item);
 
   const navItems: { title: View; icon: string }[] = [
-    { title: "Overview", icon: "grid" }, { title: "Players", icon: "users" }, { title: "Game day", icon: "play" }, { title: "Matchup lab", icon: "compare" }, { title: "Playbook", icon: "book" }, { title: "My Team", icon: "lineup" }, { title: "Film room", icon: "film" }
+    { title: "Overview", icon: "grid" }, { title: "Players", icon: "users" }, { title: "Game day", icon: "play" }, { title: "Matchup lab", icon: "compare" }, { title: "Playbook", icon: "book" }, { title: "My Team", icon: "lineup" }, { title: "Game history", icon: "history" }
   ];
   const syncLabel = !isLoaded
     ? "CHECKING ACCOUNT"
@@ -705,7 +709,7 @@ export default function Home() {
               {players.find(player => player.id === randomPlayerId) ? <button className="random-player" onClick={() => openPlayer(players.find(player => player.id === randomPlayerId)!)}><span className="player-avatar">{players.find(player => player.id === randomPlayerId)?.initials}</span><span><b>{players.find(player => player.id === randomPlayerId)?.name}</b><small>{players.find(player => player.id === randomPlayerId)?.position} · {players.find(player => player.id === randomPlayerId)?.team}</small></span><Icon name="arrow" size={15} /></button> : <div className="fan-tool-empty">No pick yet. Choose a name from the current player directory.</div>}
             </section>
             <section className="panel fan-tool-card">
-              <header className="panel-header"><div><div className="panel-title">Recently viewed</div><div className="panel-caption">Your last five film-room stops.</div></div><Icon name="trend" size={16} /></header>
+              <header className="panel-header"><div><div className="panel-title">Recently viewed</div><div className="panel-caption">Your last five player profiles.</div></div><Icon name="trend" size={16} /></header>
               {recentlyViewed.length ? <div className="recent-list">{recentlyViewed.map(id => {
                 const player = players.find(item => item.id === id);
                 return player ? <button key={id} onClick={() => openPlayer(player)}><span>{player.name}</span><small>{player.position}</small></button> : null;
@@ -714,7 +718,7 @@ export default function Home() {
           </div>
           <div className="section-head"><div><div className="eyebrow">Get into the details</div><h2>Choose your angle</h2></div></div>
           <div className="stat-strip">
-            {[["Player directory", "Search the 2026 player pool by name, position, or team.", "Players", "users"], ["Build your playbook", "Save formations, concepts, and the situations they fit.", "Playbook", "book"], ["Your current team", "See every player you have added from the directory.", "My Team", "lineup"], ["Six football lenses", "Compare tactical perspectives from a simulated panel.", "Film room", "film"]].map(([title, desc, destination, icon]) => <button className="stat-card" key={title} onClick={() => goto(destination as View)} style={{ textAlign: "left", width: "100%", border: "1px solid var(--line)" }}><div><div className="stat-label">{title}</div><div className="section-sub" style={{ maxWidth: 195, lineHeight: 1.45 }}>{desc}</div></div><div className="stat-mark"><Icon name={icon} size={16} /></div></button>)}
+            {[["Player directory", "Search the 2026 player pool by name, position, or team.", "Players", "users"], ["Build your playbook", "Save formations, concepts, and the situations they fit.", "Playbook", "book"], ["Your current team", "See every player you have added from the directory.", "My Team", "lineup"], ["Your game history", "Review your completed bot and online matches.", "Game history", "history"]].map(([title, desc, destination, icon]) => <button className="stat-card" key={title} onClick={() => goto(destination as View)} style={{ textAlign: "left", width: "100%", border: "1px solid var(--line)" }}><div><div className="stat-label">{title}</div><div className="section-sub" style={{ maxWidth: 195, lineHeight: 1.45 }}>{desc}</div></div><div className="stat-mark"><Icon name={icon} size={16} /></div></button>)}
           </div>
         </>}
 
@@ -799,7 +803,7 @@ export default function Home() {
             : <div className="empty-state current-team-empty"><strong>Your team is empty</strong><p>Browse the player directory and add players to build your roster. Your saved team will appear here.</p><button className="primary-button" onClick={() => { setPlayerFilter("all"); setQuery(""); setPosition("All positions"); goto("Players"); }}><Icon name="users" size={14} /> Browse players</button></div>}
         </section>}
 
-        {view === "Game day" && <PlayCallingGame players={players} teamPlayers={teamPlayers} isSignedIn={Boolean(isSignedIn)} />}
+        {view === "Game day" && <PlayCallingGame players={players} teamPlayers={teamPlayers} isSignedIn={Boolean(isSignedIn)} onBotGameComplete={recordCompletedBotGame} />}
 
         {view === "Matchup lab" && <section className="section-layout">
           <div className="section-head" style={{ marginTop: 4 }}><div><div className="eyebrow">Head-to-head breakdown</div><h2>Matchup lab</h2><div className="section-sub">Select two players in the directory or compare the default 2026 season snapshot.</div></div><button className="secondary-button" onClick={() => goto("Players")}>Browse players <Icon name="arrow" size={13} /></button></div>
@@ -816,12 +820,7 @@ export default function Home() {
           <div className="panel table-panel"><table className="data-table"><thead><tr><th>Concept / play name</th><th>Formation</th><th>Personnel</th><th>Situation &amp; tags</th><th>Actions</th></tr></thead><tbody>{filteredPlays.map(play => <tr key={play.id}><td><strong>{play.name}</strong><div className="section-sub">{play.note || play.concept}</div></td><td>{play.formation}</td><td><span className="tag">{play.personnel}</span></td><td><span className="tag gold">{play.situation}</span><div className="play-tags">{(play.tags || []).map(tag => <span className="tag" key={tag}>{tag}</span>)}</div></td><td><div className="table-actions"><button className="icon-button" aria-label={`Edit ${play.name}`} onClick={() => openEditor("play", play)}><Icon name="edit" size={14} /></button><button className="icon-button" aria-label={`Delete ${play.name}`} onClick={() => removeItem("play", play.id)}><Icon name="trash" size={14} /></button></div></td></tr>)}</tbody></table>{filteredPlays.length === 0 && plays.length > 0 && <div className="empty-state"><strong>No plays match this tag</strong><p>Try another tag or add a concept to your call sheet.</p><button className="secondary-button" onClick={() => setPlayTagFilter("All tags")}>Show all plays</button></div>}{plays.length === 0 && <div className="empty-state"><strong>Your playbook is open</strong><p>Add a concept to start building your call sheet.</p><button className="primary-button" onClick={() => openEditor("play")}><Icon name="plus" size={14} /> Add your first play</button></div>}</div>
         </section>}
 
-        {view === "Film room" && <section className="section-layout">
-          <div className="section-head" style={{ marginTop: 4 }}><div><div className="eyebrow">The tape never lies</div><h2>Film room</h2><div className="section-sub">Six distinct simulated football lenses. For conversation and learning—not real expert commentary.</div></div><span className="panel-tag">SIMULATED / DEMO</span></div>
-          <div className="notice">These are generated example perspectives, not quotes or analysis from actual NFL experts. No live game footage, data, or expert service is connected.</div>
-          <div className="analysis-grid">{experts.map((expert, index) => <article className="analyst-card" key={expert.name}><div className="analyst-top"><span className="analyst-number">0{index + 1}</span><div><div className="analyst-name">{expert.name}</div><div className="analyst-role">{expert.role}</div></div></div><p>{expert.text}</p><div className="analyst-pick">Angle to watch <b>{expert.pick}</b></div></article>)}</div>
-          <section className="panel prompt-card" style={{ marginTop: 14 }}><header className="panel-header"><div><div className="panel-title">One question for the tape</div><div className="panel-caption">A random prompt to guide your next watch-through.</div></div><button className="thin-button" onClick={newFilmPrompt}>New prompt</button></header><div className="film-prompt">{filmPrompt}</div></section>
-        </section>}
+        {view === "Game history" && <GameHistory players={players} botGames={gameHistory} isSignedIn={Boolean(isSignedIn)} onPlayGame={() => goto("Game day")} />}
       </div>
     </main>
 

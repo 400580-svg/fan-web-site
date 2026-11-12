@@ -500,6 +500,20 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .field-line-label { fill: #d9f4ff; font: 600 8px var(--font-mono); text-anchor: middle; }
 .field-line-label.first-down { fill: #ffe28a; }
 .field-pass-arc { fill: none; stroke: rgba(255,194,14,.8); stroke-width: 2; stroke-dasharray: 5 5; opacity: 0; }
+.field-play-markers { transform-box: view-box; }
+.field-play-markers.is-moving { animation: markers-advance 1.55s ease-out both; }
+.field-team-shift { transform-box: view-box; }
+.field-team-shift.is-advancing { animation: team-follows-ball 1.55s ease-out both; }
+.field-goalpost { fill: none; stroke: #ffc20e; stroke-width: 4; stroke-linecap: round; opacity: .9; }
+.field-score-callout { pointer-events: none; }
+.field-score-callout rect { fill: rgba(8,24,36,.94); stroke: #ffc20e; stroke-width: 2; }
+.field-score-callout.is-turnover rect { stroke: #bdeeff; }
+.field-score-title { fill: #ffc20e; font: 800 21px var(--font-display); letter-spacing: .6px; text-anchor: middle; }
+.field-score-callout.is-turnover .field-score-title { fill: #bdeeff; font-size: 17px; }
+.field-score-subtitle { fill: #f3f7fa; font: 600 9px var(--font-mono); text-anchor: middle; }
+.field-score-callout.is-arriving { transform-box: fill-box; transform-origin: center; animation: score-callout-pop .45s .9s cubic-bezier(.16,.8,.3,1) both; }
+.drive-simulation.is-animating .sim-ball.ball-scoring { animation-duration: 1.7s; filter: drop-shadow(0 0 7px #ffc20e); }
+.drive-simulation:has(.field-score-callout.is-score) .drive-field-wrap { box-shadow: inset 0 0 0 2px rgba(255,194,14,.65), 0 0 18px rgba(255,194,14,.18); }
 .sim-token { transform-box: fill-box; transform-origin: center; }
 .sim-token-disc { stroke: rgba(255,255,255,.92); stroke-width: 2; }
 .sim-offense-disc { fill: #087fbd; }
@@ -509,22 +523,37 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .sim-ball { opacity: .8; transform-box: fill-box; transform-origin: center; }
 .drive-simulation.is-animating.play-quick_pass .field-pass-arc,.drive-simulation.is-animating.play-deep_pass .field-pass-arc { opacity: 1; animation: pass-arc-show 1.5s ease-out both; }
 .drive-simulation.is-animating .sim-dl1,.drive-simulation.is-animating .sim-dl2,.drive-simulation.is-animating .sim-dl3,.drive-simulation.is-animating .sim-dl4,.drive-simulation.is-animating .sim-lb1,.drive-simulation.is-animating .sim-lb2 { animation: defense-close 1.25s ease-in-out both; }
+.drive-simulation.is-animating .sim-db1,.drive-simulation.is-animating .sim-s1 { animation: defense-track-up 1.25s ease-in-out both; }
+.drive-simulation.is-animating .sim-db2,.drive-simulation.is-animating .sim-s2 { animation: defense-track-down 1.25s ease-in-out both; }
 .drive-simulation.is-animating.play-run .sim-rb { animation: run-break 1.45s cubic-bezier(.15,.75,.35,1) both; }
 .drive-simulation.is-animating.play-run .sim-ball { animation: ball-run 1.25s ease-in-out both; }
 .drive-simulation.is-animating.play-quick_pass .sim-wr1,.drive-simulation.is-animating.play-quick_pass .sim-te { animation: quick-route 1.35s ease-out both; }
 .drive-simulation.is-animating.play-quick_pass .sim-ball,.drive-simulation.is-animating.play-deep_pass .sim-ball { animation: ball-pass 1.3s cubic-bezier(.15,.65,.3,1) both; }
 .drive-simulation.is-animating.play-deep_pass .sim-wr2 { animation: deep-route 1.55s ease-out both; }
-@keyframes run-break { 0% { translate: 0 0; } 45% { translate: var(--gain-mid) -4px; } 100% { translate: var(--gain) 0; } }
-@keyframes quick-route { 0% { translate: 0 0; } 35% { translate: 22px -16px; } 100% { translate: var(--gain) var(--target-y); } }
-@keyframes deep-route { 0% { translate: 0 0; } 35% { translate: 64px -8px; } 100% { translate: var(--gain) var(--target-y); } }
+@keyframes team-follows-ball { from { translate: 0 0; } to { translate: var(--unit-gain) 0; } }
+@keyframes run-break { 0% { translate: 0 0; } 45% { translate: var(--unit-run-extra) -4px; } 100% { translate: var(--unit-run-extra) 0; } }
+@keyframes quick-route { 0% { translate: 0 0; } 35% { translate: 22px -16px; } 100% { translate: 26px var(--target-y); } }
+@keyframes deep-route { 0% { translate: 0 0; } 35% { translate: 64px -8px; } 100% { translate: 72px var(--target-y); } }
 @keyframes defense-close { 0% { translate: 0 0; } 100% { translate: -25px 0; } }
+@keyframes defense-track-up { 0% { translate: 0 0; } 100% { translate: var(--pursuit-x) 18px; } }
+@keyframes defense-track-down { 0% { translate: 0 0; } 100% { translate: var(--pursuit-x) -18px; } }
 @keyframes ball-run { 0% { translate: 0 0; } 100% { translate: var(--gain) 0; } }
 @keyframes ball-pass { 0% { translate: 0 0; opacity: .7; } 55% { translate: var(--gain-late) var(--target-y-mid); opacity: 1; } 100% { translate: var(--gain) var(--target-y); opacity: 1; } }
 @keyframes pass-arc-show { 0% { opacity: 0; } 20%,80% { opacity: .9; } 100% { opacity: .2; } }
+@keyframes markers-advance { from { translate: 0 0; } to { translate: var(--gain) 0; } }
+@keyframes score-callout-pop { 0% { opacity: 0; scale: .72; } 70% { opacity: 1; scale: 1.06; } 100% { opacity: 1; scale: 1; } }
 .drive-sim-bottom { padding: 8px 2px 3px; display: flex; align-items: center; justify-content: space-between; gap: 9px; }
 .drive-sim-state { color: var(--gold); font: 600 8px var(--font-mono); letter-spacing: .7px; }
 .drive-sim-roster { overflow: hidden; color: #9bb1c1; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 .drive-sim-announcement { min-height: 17px; margin: 3px 2px 0; color: #c7d6e1; font-size: 9px; line-height: 1.5; }
+.drive-sim-announcement.has-score { color: #ffc20e; font-weight: 800; }
+@media (prefers-reduced-motion: reduce) {
+  .field-score-callout.is-arriving { animation: none; }
+  .field-play-markers.is-moving { animation-duration: .01ms !important; }
+  .field-team-shift.is-advancing { animation-duration: .01ms !important; }
+  .drive-simulation.is-animating .sim-token { animation-duration: .01ms !important; }
+  .drive-simulation.is-animating .sim-ball { animation-duration: .01ms !important; }
+}
 
 .game-center { padding-bottom: 30px; }
 .game-heading { align-items: end; }
@@ -621,6 +650,36 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .game-error { margin-top: 12px; padding: 10px 12px; border: 1px solid #efc2bc; border-radius: 5px; color: #913c32; background: #fff5f3; font-size: 10px; }
 .game-status-message { margin: 9px 0 0; color: #3c718e; font-size: 10px; }
 .game-rules-note { margin: 12px 2px 0; color: #7b8e9d; font-size: 9px; line-height: 1.55; }
+.game-history-view { padding-bottom: 30px; }
+.game-history-heading { align-items: end; }
+.game-history-heading h2 { margin: 4px 0 2px; }
+.game-history-actions { display: flex; align-items: center; gap: 8px; }
+.game-history-note { margin: 0 0 12px; padding: 11px 13px; border: 1px solid #cde4ef; border-radius: 5px; color: #587183; background: #f4fbfe; font-size: 10px; line-height: 1.5; }
+.game-history-list { display: grid; gap: 11px; }
+.game-history-card { overflow: hidden; border: 1px solid #dce8ee; border-radius: 7px; background: #fff; box-shadow: 0 5px 16px rgba(15,49,68,.035); }
+.game-history-card-head { padding: 12px 15px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid #e7eff3; background: #f8fbfd; }
+.game-history-card-head > div { display: grid; gap: 4px; }
+.game-history-kind { color: var(--powder-deep); font: 700 8px var(--font-mono); letter-spacing: 1px; }
+.game-history-card-head time { color: #7b8e9d; font-size: 9px; }
+.game-history-result { padding: 5px 8px; border-radius: 4px; font: 700 9px var(--font-mono); letter-spacing: .7px; }
+.game-history-result.is-win { color: #08734f; background: #e1f6ec; }
+.game-history-result.is-loss { color: #99463c; background: #fff0ed; }
+.game-history-result.is-tie { color: #735900; background: #fff7d6; }
+.game-history-scoreline { padding: 15px; display: grid; grid-template-columns: minmax(0,1fr) 68px minmax(0,1fr); align-items: center; gap: 8px; }
+.game-history-team { min-width: 0; display: grid; gap: 4px; text-align: center; }
+.game-history-team > span { color: #718698; font: 600 8px var(--font-mono); letter-spacing: .8px; text-transform: uppercase; }
+.game-history-team.is-you > span { color: var(--powder-deep); }
+.game-history-team b { color: #172a3c; font: 700 31px/.95 var(--font-display); }
+.game-history-team small { overflow: hidden; color: #8093a1; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.game-history-vs { color: #92a4b1; font: 600 8px var(--font-mono); letter-spacing: 1px; text-align: center; }
+.game-history-card-foot { min-height: 37px; padding: 8px 15px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid #e7eff3; color: #8093a1; font-size: 9px; }
+.game-history-scoring { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+.game-history-scoring span { padding: 3px 6px; border: 1px solid #f1d879; border-radius: 3px; color: #725600; background: #fff8d8; font: 700 8px var(--font-mono); }
+.game-history-empty { padding: 38px 20px; border: 1px dashed #c9dce6; border-radius: 7px; background: #fbfdfe; text-align: center; }
+.game-history-empty-icon { width: 40px; height: 40px; margin: 0 auto 11px; display: grid; place-items: center; border-radius: 50%; color: var(--powder-deep); background: #e4f5fc; font-size: 20px; }
+.game-history-empty h3 { margin: 0 0 6px; color: #1c3042; font: 700 21px var(--font-display); text-transform: uppercase; }
+.game-history-empty p { max-width: 400px; margin: 0 auto 14px; color: #718698; font-size: 10px; line-height: 1.5; }
+.game-history-loading { min-height: 95px; display: flex; align-items: center; justify-content: center; gap: 9px; color: #718698; font-size: 10px; }
 .dark-mode .game-roster-panel,.dark-mode .game-match-panel,.dark-mode .game-lobby-panel,.dark-mode .game-empty-online { border-color: #2b3e53; color: #e6eef5; background: #142235; }
 .dark-mode .game-panel-heading h3,.dark-mode .game-empty-online h3,.dark-mode .game-call-title h3,.dark-mode .game-result h3,.dark-mode .game-feed-heading h3 { color: #edf4f8; }
 .dark-mode .game-panel-heading p,.dark-mode .game-empty-online p,.dark-mode .game-call-title p,.dark-mode .game-result p { color: #9eb1c1; }
@@ -640,6 +699,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .dark-mode .game-roster-actions .section-sub,.dark-mode .game-rules-note { color: #9eb1c1; }
 .dark-mode .game-leave-button { color: #9eb1c1; }
 .dark-mode .game-leave-button:hover { color: #ffc0b6; }
+.dark-mode .game-history-card { border-color: #2b3e53; background: #142235; }
+.dark-mode .game-history-card-head { border-color: #2b3e53; background: #101c2b; }
+.dark-mode .game-history-card-head time,.dark-mode .game-history-team small,.dark-mode .game-history-card-foot { color: #9eb1c1; }
+.dark-mode .game-history-team b,.dark-mode .game-history-empty h3 { color: #edf4f8; }
+.dark-mode .game-history-card-foot { border-color: #2b3e53; }
+.dark-mode .game-history-note { border-color: #2b5066; color: #b6ccda; background: #132a3b; }
+.dark-mode .game-history-empty { border-color: #2b3e53; background: #101c2b; }
+.dark-mode .game-history-empty p,.dark-mode .game-history-loading { color: #9eb1c1; }
 
 @media (max-width: 760px) {
   .live-pill,.auth-user-label { display: none; }
@@ -668,6 +735,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .site-rating.compact .site-rating-label { font-size: 7px; }
   .directory-toolbar-title { align-items: flex-start; flex-direction: column; gap: 4px; }
   .game-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .game-history-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .game-history-actions { width: 100%; }
+  .game-history-scoreline { grid-template-columns: minmax(0,1fr) 46px minmax(0,1fr); padding: 13px 8px; gap: 4px; }
+  .game-history-team b { font-size: 26px; }
+  .game-history-team small { font-size: 7px; }
+  .game-history-card-foot { align-items: flex-start; }
   .game-roster-panel,.game-match-panel,.game-lobby-panel { padding: 14px; }
   .game-roster-slots { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .game-roster-slot:last-child { grid-column: span 2; }

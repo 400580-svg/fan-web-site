@@ -20,6 +20,7 @@ import {
 } from "@/lib/game-engine";
 import { calculate2026SiteRatings } from "@/lib/player-ratings";
 import type { PlayerProfile } from "@/lib/player-directory";
+import type { SavedBotGame } from "@/lib/progress";
 import type { OpenGame, PublicGame } from "@/lib/game-server";
 import DriveSimulation from "./DriveSimulation";
 
@@ -27,6 +28,7 @@ type Props = {
   players: PlayerProfile[];
   teamPlayers: string[];
   isSignedIn: boolean;
+  onBotGameComplete: (game: SavedBotGame) => void;
 };
 
 const slotLabels = ["Quarterback", "Running back", "Wide receiver 1", "Wide receiver 2", "Tight end"];
@@ -64,10 +66,12 @@ function scoreLabel(home: number, away: number, mySide: "home" | "away") {
   return mine > theirs ? "You win the game." : "Your opponent wins.";
 }
 
-export default function PlayCallingGame({ players, teamPlayers, isSignedIn }: Props) {
+export default function PlayCallingGame({ players, teamPlayers, isSignedIn, onBotGameComplete }: Props) {
   const [mode, setMode] = useState<"bot" | "online">("bot");
   const [rosterIds, setRosterIds] = useState(() => getRecommendedRoster(players, teamPlayers));
   const [botGame, setBotGame] = useState<GameState | null>(null);
+  const [botGameId, setBotGameId] = useState<string | null>(null);
+  const [botGameCreatedAt, setBotGameCreatedAt] = useState<string | null>(null);
   const [onlineGame, setOnlineGame] = useState<PublicGame | null>(null);
   const [openGames, setOpenGames] = useState<OpenGame[]>([]);
   const [busy, setBusy] = useState(false);
@@ -102,6 +106,8 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn }: Pr
       return;
     }
     const botRoster = getRecommendedRoster(players, [], rosterIds);
+    setBotGameId(crypto.randomUUID());
+    setBotGameCreatedAt(new Date().toISOString());
     setBotGame(createGameState(rosterIds, botRoster));
     setOnlineGame(null);
     setError("");
@@ -121,7 +127,19 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn }: Pr
         ? counterDefense(call as OffensiveCall)
         : allDefensiveCalls[Math.floor(Math.random() * allDefensiveCalls.length)]
       : call as DefensiveCall;
-    setBotGame(current => current ? resolvePlay(current, players, offenseCall, defenseCall) : current);
+    const nextGame = resolvePlay(botGame, players, offenseCall, defenseCall);
+    setBotGame(nextGame);
+    if (nextGame.drivesCompleted >= drivesPerGame) {
+      onBotGameComplete({
+        id: botGameId || crypto.randomUUID(),
+        createdAt: botGameCreatedAt || new Date().toISOString(),
+        homeRoster: nextGame.homeRoster,
+        awayRoster: nextGame.awayRoster,
+        homeScore: nextGame.homeScore,
+        awayScore: nextGame.awayScore,
+        history: nextGame.history
+      });
+    }
     setError("");
   };
 
