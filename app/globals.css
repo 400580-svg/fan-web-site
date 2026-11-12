@@ -453,7 +453,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .sync-spinner { display: inline-block; width: 22px; height: 22px; border: 2px solid #dce6ed; border-top-color: var(--powder); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.my-team-summary { display: grid; grid-template-columns: 1.35fr repeat(4,minmax(0,1fr)); gap: 8px; margin: 16px 0 24px; }
+.my-team-summary { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 8px; margin: 16px 0 24px; }
 .my-team-total,.my-team-position-count { min-height: 70px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
 .my-team-total { color: white; background: linear-gradient(130deg,#00679c,#0080c6); border-color: #0075b4; }
 .my-team-total span,.my-team-position-count span { color: #7190a2; font: 600 9px var(--font-mono); letter-spacing: .7px; }
@@ -572,6 +572,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .game-panel-heading p,.game-empty-online p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
 .game-roster-rating { min-width: 74px; padding: 8px 10px; border: 1px solid #f1d879; border-radius: 6px; color: #6d5200; background: #fff8d8; text-align: center; font: 700 22px/1 var(--font-display); }
 .game-roster-rating small { display: block; margin-top: 4px; color: #8b7440; font: 500 8px var(--font-mono); white-space: nowrap; }
+.game-roster-subhead { margin-top: 22px; padding-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); }
+.game-roster-subhead b { color: var(--powder-deep); font: 700 11px var(--font-mono); letter-spacing: 1px; }
+.game-roster-subhead span { color: var(--muted); font: 500 9px var(--font-mono); }
 .game-roster-slots { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 9px; margin-top: 18px; }
 .game-roster-slot { min-width: 0; display: grid; gap: 7px; padding: 11px; border: 1px solid #dbe9ef; border-radius: 6px; background: #f9fcfd; }
 .game-roster-slot > span { display: flex; align-items: center; gap: 7px; color: #718698; font: 600 9px var(--font-mono); text-transform: uppercase; }
@@ -579,6 +582,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .game-roster-slot select { width: 100%; min-width: 0; height: 34px; padding: 0 6px; border: 1px solid #cadde7; border-radius: 4px; color: var(--slate); background: white; font-size: 10px; }
 .game-roster-slot small { min-height: 11px; color: #718698; font-size: 9px; }
 .game-roster-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0 15px; }
+.game-roster-action-buttons { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.game-roster-action-buttons button:disabled { cursor: not-allowed; opacity: .5; }
 .game-roster-actions .section-sub { min-height: 14px; font-size: 10px; text-align: right; }
 .game-start-button { min-height: 40px; }
 .game-start-button span { margin-left: 16px; color: var(--gold); }

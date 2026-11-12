@@ -18,6 +18,8 @@ type HistoryRow = {
   createdAt: string;
   yourRoster: string[];
   opponentRoster: string[];
+  yourDefenseRoster: string[];
+  opponentDefenseRoster: string[];
   yourScore: number;
   opponentScore: number;
   history: SavedBotGame["history"];
@@ -80,6 +82,8 @@ export default function GameHistory({ players, botGames, isSignedIn, onPlayGame 
       createdAt: game.createdAt,
       yourRoster: game.homeRoster,
       opponentRoster: game.awayRoster,
+      yourDefenseRoster: game.homeDefenseRoster,
+      opponentDefenseRoster: game.awayDefenseRoster,
       yourScore: game.homeScore,
       opponentScore: game.awayScore,
       history: game.history
@@ -93,6 +97,8 @@ export default function GameHistory({ players, botGames, isSignedIn, onPlayGame 
         createdAt: game.createdAt,
         yourRoster: isHome ? game.homeRoster : game.awayRoster,
         opponentRoster: isHome ? game.awayRoster : game.homeRoster,
+        yourDefenseRoster: isHome ? game.state.homeDefenseRoster : game.state.awayDefenseRoster,
+        opponentDefenseRoster: isHome ? game.state.awayDefenseRoster : game.state.homeDefenseRoster,
         yourScore: isHome ? game.state.homeScore : game.state.awayScore,
         opponentScore: isHome ? game.state.awayScore : game.state.homeScore,
         history: game.state.history
@@ -133,9 +139,9 @@ export default function GameHistory({ players, botGames, isSignedIn, onPlayGame 
               <span className={`game-history-result ${result.className}`}>{result.label}</span>
             </header>
             <div className="game-history-scoreline">
-              <div className="game-history-team is-you"><span>Your team</span><b>{game.yourScore}</b><small>{playerNames(game.yourRoster)}</small></div>
+               <div className="game-history-team is-you"><span>Your team</span><b>{game.yourScore}</b><small title={playerNames(game.yourRoster)}>OFF · {playerNames(game.yourRoster)}</small><small title={playerNames(game.yourDefenseRoster)}>DEF · {playerNames(game.yourDefenseRoster)}</small></div>
               <span className="game-history-vs">FINAL</span>
-              <div className="game-history-team"><span>{game.kind === "bot" ? "All-Pro bot" : "Opponent"}</span><b>{game.opponentScore}</b><small>{playerNames(game.opponentRoster)}</small></div>
+               <div className="game-history-team"><span>{game.kind === "bot" ? "All-Pro bot" : "Opponent"}</span><b>{game.opponentScore}</b><small title={playerNames(game.opponentRoster)}>OFF · {playerNames(game.opponentRoster)}</small><small title={playerNames(game.opponentDefenseRoster)}>DEF · {playerNames(game.opponentDefenseRoster)}</small></div>
             </div>
             <footer className="game-history-card-foot">
               <span>{game.history.length} plays</span>

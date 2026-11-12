@@ -5,19 +5,41 @@ export type SeasonRatingInput = {
   passingYards: number | null;
   rushingYards: number | null;
   receivingYards: number | null;
+  tackles?: number;
+  sacks?: number;
+  passesDefended?: number;
+  interceptions?: number | null;
 };
 
 export type SitePlayerRating = 1 | 2 | 3 | 4 | 5 | null;
 
-function primarySeasonYards(player: SeasonRatingInput): number | null {
-  const yards = player.position === "QB"
+function primarySeasonMetric(player: SeasonRatingInput): number | null {
+  const metric = player.position === "QB"
     ? player.passingYards
     : player.position === "RB"
       ? player.rushingYards
-      : player.receivingYards;
-  return player.games > 0 && typeof yards === "number" && Number.isFinite(yards)
-    ? yards
+      : player.position === "WR" || player.position === "TE"
+        ? player.receivingYards
+        : player.position === "DE" || player.position === "DT"
+          ? player.sacks
+          : player.position === "LB"
+            ? player.tackles
+            : player.position === "CB" || player.position === "S"
+              ? (player.interceptions || 0) * 10 + (player.passesDefended || 0)
+              : null;
+  return player.games > 0 && typeof metric === "number" && Number.isFinite(metric)
+    ? metric
     : null;
+}
+
+export function getSiteRatingMetric(position: string): string {
+  if (position === "QB") return "Passing yards";
+  if (position === "RB") return "Rushing yards";
+  if (position === "WR" || position === "TE") return "Receiving yards";
+  if (position === "DE" || position === "DT") return "Sacks";
+  if (position === "LB") return "Tackles";
+  if (position === "CB" || position === "S") return "Interceptions and passes defended";
+  return "2026 stats";
 }
 
 export function calculate2026SiteRatings(
@@ -29,10 +51,10 @@ export function calculate2026SiteRatings(
   const byPosition = new Map<string, Array<{ id: string; yards: number }>>();
 
   for (const player of players) {
-    const yards = primarySeasonYards(player);
-    if (yards === null) continue;
+    const metric = primarySeasonMetric(player);
+    if (metric === null) continue;
     const positionGroup = byPosition.get(player.position) ?? [];
-    positionGroup.push({ id: player.id, yards });
+    positionGroup.push({ id: player.id, yards: metric });
     byPosition.set(player.position, positionGroup);
   }
 

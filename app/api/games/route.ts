@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getDbPool } from "@/lib/db";
-import { createGameState, validateGameRoster } from "@/lib/game-engine";
+import { createGameState, validateDefenseRoster, validateGameRoster } from "@/lib/game-engine";
 import { seasonPlayers } from "@/lib/player-directory";
 import { toOpenGame, toPublicGame, type GameRecord } from "@/lib/game-server";
 
@@ -11,7 +11,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const createGameSchema = z.object({
-  roster: z.array(z.string().min(1).max(120)).length(5)
+  roster: z.array(z.string().min(1).max(120)).length(5),
+  defenseRoster: z.array(z.string().min(1).max(120)).length(5)
 }).strict();
 const maxRequestBytes = 10_000;
 const gameColumns = "id, host_user_id, guest_user_id, status, home_roster, away_roster, state, created_at";
@@ -67,13 +68,15 @@ export async function POST(request: NextRequest) {
   }
 
   const parsed = createGameSchema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: "Choose a valid five-player roster." }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "Choose valid five-player offense and defense lineups." }, { status: 400 });
   const rosterError = validateGameRoster(parsed.data.roster, seasonPlayers);
   if (rosterError) return NextResponse.json({ error: rosterError }, { status: 400 });
+  const defenseError = validateDefenseRoster(parsed.data.defenseRoster, seasonPlayers, parsed.data.roster);
+  if (defenseError) return NextResponse.json({ error: defenseError }, { status: 400 });
 
   try {
     const id = randomUUID();
-    const state = createGameState(parsed.data.roster, []);
+    const state = createGameState(parsed.data.roster, [], parsed.data.defenseRoster, []);
     const result = await getDbPool().query<GameRecord>(
       `INSERT INTO public.play_call_games (id, host_user_id, status, home_roster, state)
        VALUES ($1, $2, 'waiting', $3::jsonb, $4::jsonb)

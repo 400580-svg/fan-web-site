@@ -2,6 +2,7 @@ import { calculate2026SiteRatings } from "@/lib/player-ratings";
 import type { PlayerProfile } from "@/lib/player-directory";
 
 export const rosterSlots = ["QB", "RB", "WR", "WR", "TE"] as const;
+export const defenseRosterSlots = ["DE", "DT", "LB", "CB", "S"] as const;
 export const drivesPerGame = 6;
 export const playsPerDrive = 8;
 
@@ -27,6 +28,8 @@ export type PlaySummary = {
 export type GameState = {
   homeRoster: string[];
   awayRoster: string[];
+  homeDefenseRoster: string[];
+  awayDefenseRoster: string[];
   homeScore: number;
   awayScore: number;
   currentOffense: GameSide;
@@ -53,6 +56,8 @@ export function normalizeGameState(state: GameState): GameState {
   const history = Array.isArray(state.history) ? state.history.map(normalizeSummary) : [];
   return {
     ...state,
+    homeDefenseRoster: Array.isArray(state.homeDefenseRoster) ? state.homeDefenseRoster : state.homeRoster,
+    awayDefenseRoster: Array.isArray(state.awayDefenseRoster) ? state.awayDefenseRoster : state.awayRoster,
     playsInDrive: Number.isInteger(state.playsInDrive) ? state.playsInDrive : 0,
     yardsOnDrive: Number.isFinite(state.yardsOnDrive) ? state.yardsOnDrive : 0,
     pending: state.pending || { offense: null, defense: null },
@@ -76,6 +81,32 @@ export function getRecommendedRoster(
   const roster: string[] = [];
 
   for (const position of rosterSlots) {
+    const candidates = [
+      ...preferredIds.map(id => available.find(player => player.id === id && player.position === position && !used.has(id))),
+      ...available.filter(player => player.position === position && !used.has(player.id))
+    ].filter((player): player is PlayerProfile => Boolean(player));
+    const selected = candidates[0];
+    if (!selected) return [];
+    used.add(selected.id);
+    roster.push(selected.id);
+  }
+
+  return roster;
+}
+
+export function getRecommendedDefenseRoster(
+  players: readonly PlayerProfile[],
+  preferredIds: readonly string[] = [],
+  excludedIds: readonly string[] = []
+): string[] {
+  const ratings = calculate2026SiteRatings(players);
+  const available = players
+    .filter(player => ratings[player.id] !== null && !excludedIds.includes(player.id))
+    .sort((a, b) => (ratings[b.id] || 0) - (ratings[a.id] || 0) || a.name.localeCompare(b.name));
+  const used = new Set<string>();
+  const roster: string[] = [];
+
+  for (const position of defenseRosterSlots) {
     const candidates = [
       ...preferredIds.map(id => available.find(player => player.id === id && player.position === position && !used.has(id))),
       ...available.filter(player => player.position === position && !used.has(player.id))
@@ -113,16 +144,47 @@ export function validateGameRoster(rosterIds: unknown, players: readonly PlayerP
   return null;
 }
 
+export function validateDefenseRoster(
+  rosterIds: unknown,
+  players: readonly PlayerProfile[],
+  excludedIds: readonly string[] = []
+): string | null {
+  if (!Array.isArray(rosterIds) || rosterIds.length !== defenseRosterSlots.length || rosterIds.some(id => typeof id !== "string")) {
+    return "Choose one defensive end, defensive tackle, linebacker, cornerback, and safety.";
+  }
+  const ids = rosterIds as string[];
+  if (new Set(ids).size !== defenseRosterSlots.length) return "Choose five different defenders.";
+  if (ids.some(id => excludedIds.includes(id))) return "A player cannot start on both offense and defense.";
+
+  const ratings = calculate2026SiteRatings(players);
+  const selected = ids.map(id => players.find(player => player.id === id));
+  if (selected.some(player => !player)) return "One or more selected defenders are not available.";
+  if (selected.some(player => ratings[player!.id] === null)) return "Choose defenders with verified 2026 season stats.";
+
+  const positions = selected.map(player => player!.position);
+  if (defenseRosterSlots.some(position => positions.filter(selectedPosition => selectedPosition === position).length !== 1)) {
+    return "Your defense needs one DE, one DT, one LB, one CB, and one safety.";
+  }
+  return null;
+}
+
 export function averageRosterRating(rosterIds: readonly string[], players: readonly PlayerProfile[]): number {
   const ratings = calculate2026SiteRatings(players);
   const values = rosterIds.map(id => ratings[id]).filter((rating): rating is 1 | 2 | 3 | 4 | 5 => rating !== null && rating !== undefined);
   return values.length ? values.reduce((total, rating) => total + rating, 0) / values.length : 0;
 }
 
-export function createGameState(homeRoster: readonly string[], awayRoster: readonly string[]): GameState {
+export function createGameState(
+  homeRoster: readonly string[],
+  awayRoster: readonly string[],
+  homeDefenseRoster: readonly string[] = homeRoster,
+  awayDefenseRoster: readonly string[] = awayRoster
+): GameState {
   return {
     homeRoster: [...homeRoster],
     awayRoster: [...awayRoster],
+    homeDefenseRoster: [...homeDefenseRoster],
+    awayDefenseRoster: [...awayDefenseRoster],
     homeScore: 0,
     awayScore: 0,
     currentOffense: "home",
@@ -162,7 +224,7 @@ export function resolvePlay(
 ): GameState {
   const offense = state.currentOffense;
   const offenseRoster = offense === "home" ? state.homeRoster : state.awayRoster;
-  const defenseRoster = offense === "home" ? state.awayRoster : state.homeRoster;
+  const defenseRoster = offense === "home" ? state.awayDefenseRoster : state.homeDefenseRoster;
   const offenseRating = averageRosterRating(offenseRoster, players);
   const defenseRating = averageRosterRating(defenseRoster, players);
   const matchupAdvantage: Record<OffensiveCall, Record<DefensiveCall, number>> = {

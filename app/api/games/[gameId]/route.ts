@@ -3,11 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getDbPool } from "@/lib/db";
 import {
-  createGameState,
   drivesPerGame,
   normalizeGameState,
   playsPerDrive,
   resolvePlay,
+  validateDefenseRoster,
   validateGameRoster,
   type DefensiveCall,
   type GameCall,
@@ -22,7 +22,11 @@ export const dynamic = "force-dynamic";
 
 const callSchema = z.enum(["run", "power_run", "outside_run", "quick_pass", "screen_pass", "deep_pass", "stack_box", "zone", "blitz", "man", "prevent", "qb_spy", "contain"]);
 const requestSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("join"), roster: z.array(z.string().min(1).max(120)).length(5) }).strict(),
+  z.object({
+    action: z.literal("join"),
+    roster: z.array(z.string().min(1).max(120)).length(5),
+    defenseRoster: z.array(z.string().min(1).max(120)).length(5)
+  }).strict(),
   z.object({ action: z.literal("call"), call: callSchema, play: z.number().int().min(0).max(drivesPerGame * playsPerDrive - 1) }).strict(),
   z.object({ action: z.literal("cancel") }).strict(),
   z.object({ action: z.literal("leave") }).strict()
@@ -126,9 +130,16 @@ export async function POST(
         await client.query("ROLLBACK");
         return NextResponse.json({ error: rosterError }, { status: 400 });
       }
+      const defenseError = validateDefenseRoster(parsed.data.defenseRoster, seasonPlayers, parsed.data.roster);
+      if (defenseError) {
+        await client.query("ROLLBACK");
+        return NextResponse.json({ error: defenseError }, { status: 400 });
+      }
       const homeRoster = readRoster(row.home_roster);
       const awayRoster = parsed.data.roster;
-      const state = createGameState(homeRoster, awayRoster);
+      const state = readGameState(row.state);
+      state.awayRoster = [...awayRoster];
+      state.awayDefenseRoster = [...parsed.data.defenseRoster];
       await client.query(
         `UPDATE public.play_call_games
          SET guest_user_id = $1, status = 'active', away_roster = $2::jsonb, state = $3::jsonb, updated_at = now()

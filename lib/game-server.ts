@@ -27,6 +27,7 @@ export type PublicGame = {
 export type OpenGame = {
   id: string;
   homeRoster: string[];
+  homeDefenseRoster: string[];
   createdAt: string;
 };
 
@@ -79,10 +80,13 @@ export function toPublicGame(row: GameRecord, userId: string): PublicGame {
   };
 }
 
-export function toOpenGame(row: Pick<GameRecord, "id" | "home_roster" | "created_at">): OpenGame {
+export function toOpenGame(row: Pick<GameRecord, "id" | "home_roster" | "state" | "created_at">): OpenGame {
+  const savedState = parseJson<GameState>(row.state);
+  const state = savedState ? normalizeGameState(savedState) : null;
   return {
     id: row.id,
     homeRoster: asStringArray(row.home_roster) || [],
+    homeDefenseRoster: state?.homeDefenseRoster || [],
     createdAt: new Date(row.created_at).toISOString()
   };
 }

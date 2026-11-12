@@ -6,8 +6,9 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import PlayerComparisonCharts from "./components/PlayerComparisonCharts";
 import { UserProgress, userProgressSchema, type SavedBotGame } from "@/lib/progress";
 import { leaderboardConfig, topTenPlayers2026, type LeaderboardPosition } from "@/lib/top-ten-2026";
-import { calculate2026SiteRatings, type SitePlayerRating } from "@/lib/player-ratings";
+import { calculate2026SiteRatings, getSiteRatingMetric, type SitePlayerRating } from "@/lib/player-ratings";
 import { seasonPlayers, type PlayerProfile as Player } from "@/lib/player-directory";
+import { defenseStatsUrl } from "@/lib/defense-2026";
 import PlayCallingGame from "./components/PlayCallingGame";
 import GameHistory from "./components/GameHistory";
 
@@ -18,12 +19,15 @@ type ModalState = { kind: "play" | "lineup"; item?: Play | Lineup } | null;
 
 const statsSourceUrl = "https://www.nfl.com/stats/player-stats";
 const statsCheckedAt = "November 9, 2026";
-const teamRosterPositions = ["QB", "RB", "WR", "TE"] as const;
+const teamRosterPositions = ["QB", "RB", "WR", "TE", "DE", "DT", "LB", "CB", "S"] as const;
 
 function primaryStat(player: Player) {
   if (!player.games) return { label: "2026 status", value: "No stats" };
   if (player.position === "QB") return { label: "Pass yds", value: player.passingYards?.toLocaleString("en-US") ?? "—" };
   if (player.position === "RB") return { label: "Rush yds", value: player.rushingYards?.toLocaleString("en-US") ?? "—" };
+  if (player.position === "DE" || player.position === "DT") return { label: "Sacks", value: String(player.sacks ?? 0) };
+  if (player.position === "LB") return { label: "Tackles", value: String(player.tackles ?? 0) };
+  if (player.position === "CB" || player.position === "S") return { label: "INT", value: String(player.interceptions ?? 0) };
   return { label: "Rec yds", value: player.receivingYards?.toLocaleString("en-US") ?? "—" };
 }
 function leaderboardStat(player: Player) {
@@ -32,7 +36,7 @@ function leaderboardStat(player: Player) {
   return { label: "Receiving yards", value: player.receivingYards?.toLocaleString("en-US") ?? "—" };
 }
 function SiteRatingDisplay({ rating, position, compact = false }: { rating: SitePlayerRating; position: string; compact?: boolean }) {
-  const metric = leaderboardConfig[position as LeaderboardPosition]?.metric || "2026 stats";
+  const metric = getSiteRatingMetric(position);
   const accessibleRating = rating === null
     ? "No verified 2026 stats"
     : `${rating} out of 5 stars, based on ${metric.toLowerCase()}`;
@@ -52,15 +56,36 @@ function SiteRatingDisplay({ rating, position, compact = false }: { rating: Site
 function primaryYards(player: Player) {
   if (player.position === "QB") return player.passingYards;
   if (player.position === "RB") return player.rushingYards;
+  if (player.position === "DE" || player.position === "DT") return player.sacks ?? null;
+  if (player.position === "LB") return player.tackles ?? null;
+  if (player.position === "CB" || player.position === "S") return (player.interceptions || 0) * 10 + (player.passesDefended || 0);
   return player.receivingYards;
 }
-function primaryTouchdowns(player: Player) {
+function primaryImpact(player: Player) {
   if (player.position === "QB") return (player.passingTouchdowns ?? 0) + (player.rushingTouchdowns ?? 0);
   if (player.position === "RB") return (player.rushingTouchdowns ?? 0) + (player.receivingTouchdowns ?? 0);
+  if (player.position === "DE" || player.position === "DT") return player.sacks ?? 0;
+  if (player.position === "LB") return player.tackles ?? 0;
+  if (player.position === "CB" || player.position === "S") return player.interceptions ?? 0;
   return player.receivingTouchdowns ?? 0;
 }
 function playerStatRows(player: Player) {
   if (!player.games) return [{ label: "2026 line", value: "No stats reported" }];
+  if (player.position === "DE" || player.position === "DT") return [
+    { label: "Sacks", value: String(player.sacks ?? 0) },
+    { label: "Tackles", value: String(player.tackles ?? 0) },
+    { label: "Tackles for loss", value: String(player.tacklesForLoss ?? 0) }
+  ];
+  if (player.position === "LB") return [
+    { label: "Tackles", value: String(player.tackles ?? 0) },
+    { label: "Sacks", value: String(player.sacks ?? 0) },
+    { label: "Interceptions", value: String(player.interceptions ?? 0) }
+  ];
+  if (player.position === "CB" || player.position === "S") return [
+    { label: "Interceptions", value: String(player.interceptions ?? 0) },
+    { label: "Passes defended", value: String(player.passesDefended ?? 0) },
+    { label: "Tackles", value: String(player.tackles ?? 0) }
+  ];
   if (player.position === "QB") return [
     { label: "Pass yards", value: player.passingYards?.toLocaleString("en-US") ?? "—" },
     { label: "TD / INT", value: `${player.passingTouchdowns ?? 0} / ${player.interceptions ?? 0}` },
@@ -470,7 +495,7 @@ export default function Home() {
       if (bYards === null) return -1;
       return bYards - aYards;
     }
-    if (sortBy === "touchdowns") return (b.games ? primaryTouchdowns(b) : -1) - (a.games ? primaryTouchdowns(a) : -1);
+    if (sortBy === "touchdowns") return (b.games ? primaryImpact(b) : -1) - (a.games ? primaryImpact(a) : -1);
     return a.name.localeCompare(b.name);
   }), [players, query, position, playerFilter, favorites, teamPlayers, sortBy]);
   const currentTeamPlayers = useMemo(() => players
@@ -744,15 +769,15 @@ export default function Home() {
               })}
             </div>
             <div className="leaderboard-source">Ranked by {leaderboardConfig[leaderboardPosition].metric} · Stats checked {statsCheckedAt} · Snapshot does not update automatically · <a href={leaderboardConfig[leaderboardPosition].sourceUrl} target="_blank" rel="noreferrer">StatMuse source</a></div>
-            <div className="rating-explanation">Site ratings compare 2026 position-specific yardage: the top fifth earns 5 stars and the bottom fifth earns 1. They are separate from your personal ratings. Players without 2026 stats are marked unrated.</div>
+            <div className="rating-explanation">Site ratings compare each position’s 2026 production: offense is ranked by yardage, while defenders are ranked by sacks, tackles, interceptions, and passes defended. The top fifth earns 5 stars and the bottom fifth earns 1. Players without 2026 stats are unrated.</div>
           </section>
           <div className="directory-toolbar-title"><div className="eyebrow">Search the player pool</div><span>{players.length} players · Add any result to your team</span></div>
           <div className="section-toolbar">
             <label className="search-box"><Icon name="search" size={15} /><input aria-label="Search players" placeholder="Search players, teams, or positions..." value={query} onChange={event => setQuery(event.target.value)} /></label>
             <div className="toolbar-filters">
-              <select className="select-control" aria-label="Filter by position" value={position} onChange={event => setPosition(event.target.value)}>{["All positions", "QB", "RB", "WR", "TE"].map(value => <option key={value}>{value}</option>)}</select>
+              <select className="select-control" aria-label="Filter by position" value={position} onChange={event => setPosition(event.target.value)}>{["All positions", "QB", "RB", "WR", "TE", "DE", "DT", "LB", "CB", "S"].map(value => <option key={value}>{value}</option>)}</select>
               <select className="select-control" aria-label="Filter player group" value={playerFilter} onChange={event => setPlayerFilter(event.target.value as "all" | "favorites" | "team")}><option value="all">All players</option><option value="favorites">Favorites ({favorites.length})</option><option value="team">My team ({teamPlayers.length})</option></select>
-              <select className="select-control" aria-label="Sort players" value={sortBy} onChange={event => setSortBy(event.target.value)}><option value="name">Sort: name</option><option value="yards">Sort: primary yards</option><option value="touchdowns">Sort: touchdowns</option></select>
+              <select className="select-control" aria-label="Sort players" value={sortBy} onChange={event => setSortBy(event.target.value)}><option value="name">Sort: name</option><option value="yards">Sort: key stat</option><option value="touchdowns">Sort: impact stat</option></select>
               <button className="secondary-button" onClick={downloadPlayerCsv}>Export CSV</button>
             </div>
           </div>
@@ -774,7 +799,7 @@ export default function Home() {
             <div className="player-bottom"><span className="demo-badge">{player.games ? `2026 · ${player.games} games` : "No 2026 stats reported"}</span><label className="compare-check"><input type="checkbox" checked={selected.includes(player.id)} onChange={() => togglePlayer(player.id)} /> Compare</label></div>
             <button className={`team-player-button ${teamPlayers.includes(player.id) ? "is-added" : ""}`} aria-pressed={teamPlayers.includes(player.id)} onClick={() => toggleTeamPlayer(player.id)}><Icon name={teamPlayers.includes(player.id) ? "close" : "plus"} size={13} />{teamPlayers.includes(player.id) ? "Remove from team" : "Add to team"}</button>
           </article>)}</div> : <div className="empty-state"><strong>{playerFilter === "team" && teamPlayers.length === 0 ? "Your team is empty" : "No players in this huddle"}</strong><p>{playerFilter === "team" && teamPlayers.length === 0 ? "Search the player directory and add players to build your roster." : "Try a different name or position filter."}</p><button className="secondary-button" onClick={() => { setQuery(""); setPosition("All positions"); setPlayerFilter("all"); }}>{playerFilter === "team" && teamPlayers.length === 0 ? "Browse all players" : "Clear filters"}</button></div>}
-          <p className="demo-badge" style={{ marginTop: 13 }}>Directory profiles use NFL.com stats; position rankings use StatMuse 2026 leader data. Both are snapshots checked {statsCheckedAt}, not live feeds. <a href={statsSourceUrl} target="_blank" rel="noreferrer">NFL.com stats</a> · <a href={leaderboardConfig[leaderboardPosition].sourceUrl} target="_blank" rel="noreferrer">Selected leaderboard source</a>.</p>
+          <p className="demo-badge" style={{ marginTop: 13 }}>Offensive profiles use NFL.com stats; defensive profiles use ESPN defensive stats; position rankings use StatMuse 2026 leader data. These are snapshots checked {statsCheckedAt}, not live feeds. <a href={statsSourceUrl} target="_blank" rel="noreferrer">NFL.com stats</a> · <a href={defenseStatsUrl} target="_blank" rel="noreferrer">ESPN defensive stats</a> · <a href={leaderboardConfig[leaderboardPosition].sourceUrl} target="_blank" rel="noreferrer">Selected leaderboard source</a>.</p>
         </section>}
 
         {view === "My Team" && <section className="section-layout current-team-view">
@@ -803,7 +828,16 @@ export default function Home() {
             : <div className="empty-state current-team-empty"><strong>Your team is empty</strong><p>Browse the player directory and add players to build your roster. Your saved team will appear here.</p><button className="primary-button" onClick={() => { setPlayerFilter("all"); setQuery(""); setPosition("All positions"); goto("Players"); }}><Icon name="users" size={14} /> Browse players</button></div>}
         </section>}
 
-        {view === "Game day" && <PlayCallingGame players={players} teamPlayers={teamPlayers} isSignedIn={Boolean(isSignedIn)} onBotGameComplete={recordCompletedBotGame} />}
+        {view === "Game day" && <PlayCallingGame
+          players={players}
+          teamPlayers={teamPlayers}
+          isSignedIn={Boolean(isSignedIn)}
+          onBotGameComplete={recordCompletedBotGame}
+          onSaveTeamRoster={playerIds => {
+            setTeamPlayers(current => [...new Set([...current, ...playerIds])]);
+            setToast(isSignedIn ? "Your offense and defense are saved to My Team." : "Your offense and defense are saved on this device.");
+          }}
+        />}
 
         {view === "Matchup lab" && <section className="section-layout">
           <div className="section-head" style={{ marginTop: 4 }}><div><div className="eyebrow">Head-to-head breakdown</div><h2>Matchup lab</h2><div className="section-sub">Select two players in the directory or compare the default 2026 season snapshot.</div></div><button className="secondary-button" onClick={() => goto("Players")}>Browse players <Icon name="arrow" size={13} /></button></div>
@@ -825,11 +859,11 @@ export default function Home() {
     </main>
 
     {playerDetail && <Modal title={playerDetail.name} subtitle={`${playerDetail.position} · #${playerDetail.number} · ${playerDetail.team}`} onClose={() => setPlayerDetail(null)} footer={<><button className="secondary-button" onClick={() => { toggleFavorite(playerDetail.id); }}>{favorites.includes(playerDetail.id) ? "Remove favorite" : "Save favorite"}</button><button className="secondary-button" aria-pressed={teamPlayers.includes(playerDetail.id)} onClick={() => toggleTeamPlayer(playerDetail.id)}>{teamPlayers.includes(playerDetail.id) ? "Remove from team" : "Add to team"}</button><button className="primary-button" onClick={() => { togglePlayer(playerDetail.id); setPlayerDetail(null); }}>Select for comparison</button></>}>
-      <div className="notice">{playerDetail.positionRank ? `2026 position-ranking snapshot from StatMuse, checked ${statsCheckedAt}. Rankings do not update automatically.` : `2026 regular-season stats from NFL.com, checked ${statsCheckedAt}. This saved snapshot does not update automatically. A player with no line is shown without invented zero statistics.`}</div>
+      <div className="notice">{playerDetail.positionRank ? `2026 position-ranking snapshot from StatMuse, checked ${statsCheckedAt}. Rankings do not update automatically.` : `2026 regular-season stats from ${["DE", "DT", "LB", "CB", "S"].includes(playerDetail.position) ? "ESPN" : "NFL.com"}, checked ${statsCheckedAt}. This saved snapshot does not update automatically.`}</div>
       <div className="detail-profile"><div className="player-avatar">{playerDetail.initials}</div><div><div className="detail-grade">2026 regular season <b>{playerDetail.games ? `${playerDetail.games} games` : "No stats"}</b></div><div className="section-sub">{primaryStat(playerDetail).label}: {primaryStat(playerDetail).value}</div></div></div>
       <div className="player-stats">{playerStatRows(playerDetail).map(stat => <div className="player-stat" key={stat.label}><span>{stat.label}</span><b>{stat.value}</b></div>)}</div>
       <SiteRatingDisplay rating={siteRatings[playerDetail.id] ?? null} position={playerDetail.position} />
-      <a href={playerDetail.statsUrl} target="_blank" rel="noreferrer" className="section-sub">{playerDetail.positionRank ? "Open the position ranking source" : `View ${playerDetail.name}'s NFL.com stats`}</a>
+      <a href={playerDetail.statsUrl} target="_blank" rel="noreferrer" className="section-sub">{playerDetail.positionRank ? "Open the position ranking source" : `View ${playerDetail.name}'s ${["DE", "DT", "LB", "CB", "S"].includes(playerDetail.position) ? "ESPN" : "NFL.com"} stats`}</a>
       <div className="detail-note"><div className="eyebrow">{playerDetail.positionRank ? "2026 position rank" : "Illustrative film cue"}</div><p>{playerDetail.positionRank ? `#${playerDetail.positionRank} by ${leaderboardConfig[playerDetail.position as LeaderboardPosition].metric}.` : playerDetail.note}</p></div>
       <div className="player-rating detail-rating" role="group" aria-label={`Your rating for ${playerDetail.name}`}><span>Your rating</span>{[1, 2, 3, 4, 5].map(star => <button key={star} aria-label={`Rate ${playerDetail.name} ${star} out of 5`} aria-pressed={(playerRatings[playerDetail.id] || 0) === star} onClick={() => setRating(playerDetail.id, star)} className={(playerRatings[playerDetail.id] || 0) >= star ? "rated" : ""}><Icon name="star" size={14} /></button>)}<b>{playerRatings[playerDetail.id] ? `${playerRatings[playerDetail.id]}/5` : "Not rated"}</b></div>
     </Modal>}
@@ -853,7 +887,7 @@ export default function Home() {
         <div className="field full"><label htmlFor="note">{resource === "play" ? "Coaching note" : "Lineup note"}</label><textarea id="note" value={formValues.note || ""} onChange={event => setFormValues({ ...formValues, note: event.target.value })} placeholder={resource === "play" ? "What is the read? What should the defense show?" : "Why does this lineup fit the matchup?"} /></div>
       </div>{formError && <p role="alert" style={{ color: "#ae4853", fontSize: 11, margin: "10px 0 0" }}>{formError}</p>}</form>
     </Modal>}
-    {comparisonOpen && <Modal title="Head-to-head" subtitle="2026 regular-season snapshot." onClose={() => setComparisonOpen(false)}><div className="notice">Stats checked {statsCheckedAt}; this is not a live feed. Film cues are illustrative.</div><div className="comparison">{(comparePlayers.length === 2 ? comparePlayers : [players[0], players[1]]).map((player, index) => <div className="comparison-side" key={player.id}><div className="comparison-head"><small>{index === 0 ? "PLAYER 01" : "PLAYER 02"} · {player.position}</small><h3>{player.name}</h3></div><div className="compare-line"><span>Team / status</span><b>{player.team}</b></div><div className="compare-line"><span>Games played</span><b>{player.games}</b></div>{playerStatRows(player).map(stat => <div className="compare-line" key={stat.label}><span>{stat.label}</span><b>{stat.value}</b></div>)}<a href={player.statsUrl} target="_blank" rel="noreferrer" className="section-sub">{player.positionRank ? "StatMuse ranking source" : "NFL.com stats"}</a></div>)}</div><div className="dialog-footer" style={{ padding: "16px 0 0" }}><button className="primary-button" onClick={() => { setComparisonOpen(false); goto("Matchup lab"); }}>Open tactical panel <Icon name="arrow" size={13} /></button></div></Modal>}
+    {comparisonOpen && <Modal title="Head-to-head" subtitle="2026 regular-season snapshot." onClose={() => setComparisonOpen(false)}><div className="notice">Stats checked {statsCheckedAt}; this is not a live feed. Film cues are illustrative.</div><div className="comparison">{(comparePlayers.length === 2 ? comparePlayers : [players[0], players[1]]).map((player, index) => <div className="comparison-side" key={player.id}><div className="comparison-head"><small>{index === 0 ? "PLAYER 01" : "PLAYER 02"} · {player.position}</small><h3>{player.name}</h3></div><div className="compare-line"><span>Team / status</span><b>{player.team}</b></div><div className="compare-line"><span>Games played</span><b>{player.games}</b></div>{playerStatRows(player).map(stat => <div className="compare-line" key={stat.label}><span>{stat.label}</span><b>{stat.value}</b></div>)}<a href={player.statsUrl} target="_blank" rel="noreferrer" className="section-sub">{player.positionRank ? "StatMuse ranking source" : ["DE", "DT", "LB", "CB", "S"].includes(player.position) ? "ESPN defensive stats" : "NFL.com stats"}</a></div>)}</div><div className="dialog-footer" style={{ padding: "16px 0 0" }}><button className="primary-button" onClick={() => { setComparisonOpen(false); goto("Matchup lab"); }}>Open tactical panel <Icon name="arrow" size={13} /></button></div></Modal>}
     {toast && <div className="toast" role="status">{toast}</div>}
   </div>;
 }

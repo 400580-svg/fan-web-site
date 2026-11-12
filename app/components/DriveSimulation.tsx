@@ -37,7 +37,9 @@ export default function DriveSimulation({ state, players, isAnimating }: Props) 
   const isFinal = state.drivesCompleted >= drivesPerGame;
   const offenseSide = lastDrive && (isAnimating || !lastPlayEnded || isFinal) ? lastDrive.offense : state.currentOffense;
   const offenseIds = offenseSide === "home" ? state.homeRoster : state.awayRoster;
+  const defenseIds = offenseSide === "home" ? state.awayDefenseRoster : state.homeDefenseRoster;
   const offensePlayerNames = useMemo(() => offenseIds.map(id => players.find(player => player.id === id)?.name || "Player"), [offenseIds, players]);
+  const defensePlayerNames = useMemo(() => defenseIds.map(id => players.find(player => player.id === id)?.name || "Player"), [defenseIds, players]);
   const callClass = lastDrive ? `play-${lastDrive.offenseCall}` : "play-opening";
   const yards = lastDrive?.yards || 0;
   const direction = offenseSide === "home" ? 1 : -1;
@@ -146,7 +148,7 @@ export default function DriveSimulation({ state, players, isAnimating }: Props) 
     </div>
     <div className="drive-sim-bottom">
       <span className="drive-sim-state">{isAnimating ? "PLAY IN MOTION" : lastDrive ? `PLAY ${lastDrive.playNumber || 1} · ${lastDrive.driveYards ?? lastDrive.yards} DRIVE YARDS · ${lastDrive.points ? `${lastDrive.points} POINTS` : lastPlayEnded ? "POSSESSION OVER" : `${playsPerDrive - state.playsInDrive} PLAYS LEFT`}` : "READY FOR THE SNAP"}</span>
-      <span className="drive-sim-roster" title={offensePlayerNames.join(", ")}>{offensePlayerNames.slice(0, 3).join(" · ")}{offensePlayerNames.length > 3 ? " +" : ""}</span>
+      <span className="drive-sim-roster" title={`Offense: ${offensePlayerNames.join(", ")}. Defense: ${defensePlayerNames.join(", ")}`}>OFF {offensePlayerNames.length} · DEF {defensePlayerNames.length}</span>
     </div>
     <p className={`drive-sim-announcement ${lastDrive?.points ? "has-score" : ""}`} aria-live="polite">{isAnimating ? `Ball snapped — ${callLabel.toLowerCase()} in motion.` : announcement}</p>
   </section>;

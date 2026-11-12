@@ -21,20 +21,37 @@ type PlayerForChart = {
   passingYards: number | null;
   rushingYards: number | null;
   receivingYards: number | null;
+  position: string;
+  tackles?: number;
+  sacks?: number;
+  interceptions?: number | null;
+  passesDefended?: number;
 };
 
-const statTypes = [
+const offensiveStatTypes = [
   { key: "passingYards" as const, label: "Passing yards", shortLabel: "Pass yds" },
   { key: "rushingYards" as const, label: "Rushing yards", shortLabel: "Rush yds" },
   { key: "receivingYards" as const, label: "Receiving yards", shortLabel: "Rec yds" }
 ];
+const defensiveStatTypes = [
+  { key: "tackles" as const, label: "Tackles", shortLabel: "Tackles" },
+  { key: "sacks" as const, label: "Sacks", shortLabel: "Sacks" },
+  { key: "interceptions" as const, label: "Interceptions", shortLabel: "INT" },
+  { key: "passesDefended" as const, label: "Passes defended", shortLabel: "Pass def." }
+];
+const isDefensivePosition = (position: string) => ["DE", "DT", "LB", "CB", "S"].includes(position);
 
 export default function PlayerComparisonCharts({ players }: { players: PlayerForChart[] }) {
   if (players.length < 2) return null;
 
   const first = players[0];
   const second = players[1];
-  const getValue = (player: PlayerForChart, key: typeof statTypes[number]["key"]) => player[key] ?? 0;
+  const isDefenseComparison = isDefensivePosition(first.position) && isDefensivePosition(second.position);
+  if (isDefensivePosition(first.position) !== isDefensivePosition(second.position)) {
+    return <div className="notice">Choose two offensive players or two defensive players to compare matching stat types.</div>;
+  }
+  const statTypes = isDefenseComparison ? defensiveStatTypes : offensiveStatTypes;
+  const getValue = (player: PlayerForChart, key: (typeof statTypes)[number]["key"]) => player[key] ?? 0;
   const radarData = statTypes.map(stat => {
     const firstValue = getValue(first, stat.key);
     const secondValue = getValue(second, stat.key);
@@ -51,9 +68,9 @@ export default function PlayerComparisonCharts({ players }: { players: PlayerFor
     second: getValue(second, stat.key)
   }));
 
-  return <section className="comparison-charts" aria-label="NFL.com 2026 player statistics charts">
+  return <section className="comparison-charts" aria-label={`2026 ${isDefenseComparison ? "defensive" : "offensive"} player statistics charts`}>
     <article className="panel chart-card">
-      <header className="panel-header"><div><div className="panel-title">2026 stat profile</div><div className="panel-caption">Each yardage axis is scaled to the higher value in this pair. No line is shown as zero.</div></div><span className="panel-tag">NFL.COM</span></header>
+      <header className="panel-header"><div><div className="panel-title">2026 stat profile</div><div className="panel-caption">Each axis is scaled to the higher value in this pair. No line is shown as zero.</div></div><span className="panel-tag">{isDefenseComparison ? "ESPN" : "NFL.COM"}</span></header>
       <div className="chart-wrap">
         <ResponsiveContainer width="100%" height="100%">
           <RadarChart data={radarData} outerRadius="70%">
@@ -69,7 +86,7 @@ export default function PlayerComparisonCharts({ players }: { players: PlayerFor
       <div className="chart-legend"><span><i className="legend-blue" />{first.name}</span><span><i className="legend-gold" />{second.name}</span></div>
     </article>
     <article className="panel chart-card">
-      <header className="panel-header"><div><div className="panel-title">Season yards by category</div><div className="panel-caption">Official 2026 NFL.com totals; categories reflect each player&apos;s role.</div></div><span className="panel-tag">2026</span></header>
+      <header className="panel-header"><div><div className="panel-title">Season stats by category</div><div className="panel-caption">2026 totals; categories reflect each player&apos;s role.</div></div><span className="panel-tag">2026</span></header>
       <div className="chart-wrap">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={yardageData} margin={{ top: 10, right: 10, left: -18, bottom: 6 }}>

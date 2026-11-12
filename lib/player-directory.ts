@@ -1,4 +1,5 @@
 import { leaderboardConfig, topTenPlayers2026 } from "@/lib/top-ten-2026";
+import { defenseStatsUrl, defensivePlayers2026 } from "@/lib/defense-2026";
 
 export type PlayerProfile = {
   id: string;
@@ -16,6 +17,10 @@ export type PlayerProfile = {
   receptions: number | null;
   receivingYards: number | null;
   receivingTouchdowns: number | null;
+  tackles?: number;
+  sacks?: number;
+  tacklesForLoss?: number;
+  passesDefended?: number;
   statsUrl: string;
   initials: string;
   note: string;
@@ -61,7 +66,33 @@ const rankedPlayerProfiles: PlayerProfile[] = topTenPlayers2026.map(ranked => {
   };
 });
 
+const defensiveProfiles: PlayerProfile[] = defensivePlayers2026.map(player => ({
+  id: player.id,
+  name: player.name,
+  team: player.team,
+  position: player.position,
+  number: "—",
+  games: player.games,
+  passingYards: null,
+  passingTouchdowns: null,
+  interceptions: player.interceptions,
+  passerRating: null,
+  rushingYards: null,
+  rushingTouchdowns: null,
+  receptions: null,
+  receivingYards: null,
+  receivingTouchdowns: null,
+  tackles: player.tackles,
+  sacks: player.sacks,
+  tacklesForLoss: player.tacklesForLoss,
+  passesDefended: player.passesDefended,
+  statsUrl: defenseStatsUrl,
+  initials: player.name.split(/\s+/).slice(0, 2).map(part => part.replace(/[^a-z]/gi, "")[0] || "").join("").toUpperCase(),
+  note: "2026 defensive production"
+}));
+
 export const seasonPlayers: PlayerProfile[] = [
   ...rankedPlayerProfiles,
+  ...defensiveProfiles,
   ...originalPlayers.filter(player => !topTenNames.has(player.name))
 ];

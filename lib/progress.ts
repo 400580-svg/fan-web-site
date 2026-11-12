@@ -44,6 +44,8 @@ const savedBotGameSchema = z.object({
   createdAt: z.string().datetime(),
   homeRoster: z.array(id).length(5),
   awayRoster: z.array(id).length(5),
+  homeDefenseRoster: z.array(id).max(5).default([]),
+  awayDefenseRoster: z.array(id).max(5).default([]),
   homeScore: z.number().int().min(0).max(42),
   awayScore: z.number().int().min(0).max(42),
   history: z.array(gamePlaySchema).max(48)
