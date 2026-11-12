@@ -3,11 +3,11 @@ import type { PlayerProfile } from "@/lib/player-directory";
 
 export const rosterSlots = ["QB", "RB", "WR", "WR", "TE"] as const;
 export const drivesPerGame = 6;
-export const playsPerDrive = 6;
+export const playsPerDrive = 8;
 
 export type GameSide = "home" | "away";
-export type OffensiveCall = "run" | "quick_pass" | "deep_pass";
-export type DefensiveCall = "stack_box" | "zone" | "blitz";
+export type OffensiveCall = "run" | "power_run" | "outside_run" | "quick_pass" | "screen_pass" | "deep_pass";
+export type DefensiveCall = "stack_box" | "zone" | "blitz" | "man" | "prevent" | "qb_spy" | "contain";
 export type GameCall = OffensiveCall | DefensiveCall;
 
 export type PlaySummary = {
@@ -136,15 +136,21 @@ export function createGameState(homeRoster: readonly string[], awayRoster: reado
 }
 
 export function counterDefense(offenseCall: OffensiveCall): DefensiveCall {
-  if (offenseCall === "run") return "stack_box";
+  if (offenseCall === "run" || offenseCall === "power_run") return "stack_box";
+  if (offenseCall === "outside_run") return "qb_spy";
   if (offenseCall === "quick_pass") return "blitz";
-  return "zone";
+  if (offenseCall === "screen_pass") return "zone";
+  return "prevent";
 }
 
 export function counterOffense(defenseCall: DefensiveCall): OffensiveCall {
   if (defenseCall === "stack_box") return "deep_pass";
-  if (defenseCall === "blitz") return "quick_pass";
-  return "run";
+  if (defenseCall === "blitz") return "screen_pass";
+  if (defenseCall === "prevent") return "run";
+  if (defenseCall === "qb_spy") return "outside_run";
+  if (defenseCall === "contain") return "power_run";
+  if (defenseCall === "man") return "quick_pass";
+  return "outside_run";
 }
 
 export function resolvePlay(
@@ -160,9 +166,12 @@ export function resolvePlay(
   const offenseRating = averageRosterRating(offenseRoster, players);
   const defenseRating = averageRosterRating(defenseRoster, players);
   const matchupAdvantage: Record<OffensiveCall, Record<DefensiveCall, number>> = {
-    run: { stack_box: -5, zone: 2, blitz: 1 },
-    quick_pass: { stack_box: 1, zone: 3, blitz: -4 },
-    deep_pass: { stack_box: 1, zone: -4, blitz: 3 }
+    run: { stack_box: -5, zone: 2, blitz: 1, man: 2, prevent: 3, qb_spy: 2, contain: -2 },
+    power_run: { stack_box: -4, zone: 1, blitz: 0, man: 1, prevent: 3, qb_spy: 1, contain: 3 },
+    outside_run: { stack_box: 1, zone: 2, blitz: -2, man: 2, prevent: 2, qb_spy: -3, contain: -4 },
+    quick_pass: { stack_box: 1, zone: 3, blitz: -4, man: -2, prevent: -2, qb_spy: 1, contain: 2 },
+    screen_pass: { stack_box: 2, zone: 0, blitz: 4, man: 1, prevent: -1, qb_spy: -1, contain: 0 },
+    deep_pass: { stack_box: 1, zone: -4, blitz: 3, man: -2, prevent: -5, qb_spy: 1, contain: 2 }
   };
   const variance = Math.round((Math.max(0, Math.min(1, roll)) * 14) - 7);
   const yards = Math.max(-4, Math.min(18, Math.round(4 + (offenseRating - defenseRating) * 1.2 + matchupAdvantage[offenseCall][defenseCall] + variance)));
@@ -181,10 +190,10 @@ export function resolvePlay(
     possessionEnded = true;
     if (driveYards >= 20) {
       points = 3;
-      message = "Field goal — the offense scores on the sixth play.";
+      message = "Field goal — the offense scores on the final play.";
     } else {
       turnoverOnDowns = true;
-      message = "No score after six plays — turnover on downs.";
+      message = `No score after ${playsPerDrive} plays — turnover on downs.`;
     }
   } else {
     const remaining = playsPerDrive - playNumber;

@@ -27,12 +27,12 @@ const lineupSchema = z.object({
 
 const gamePlaySchema = z.object({
   driveNumber: z.number().int().min(1).max(6),
-  playNumber: z.number().int().min(1).max(6),
+  playNumber: z.number().int().min(1).max(8),
   offense: z.enum(["home", "away"]),
-  offenseCall: z.enum(["run", "quick_pass", "deep_pass"]),
-  defenseCall: z.enum(["stack_box", "zone", "blitz"]),
+  offenseCall: z.enum(["run", "power_run", "outside_run", "quick_pass", "screen_pass", "deep_pass"]),
+  defenseCall: z.enum(["stack_box", "zone", "blitz", "man", "prevent", "qb_spy", "contain"]),
   yards: z.number().int().min(-4).max(18),
-  driveYards: z.number().int().min(-24).max(108),
+  driveYards: z.number().int().min(-32).max(144),
   points: z.union([z.literal(0), z.literal(3), z.literal(7)]),
   possessionEnded: z.boolean(),
   turnoverOnDowns: z.boolean(),
@@ -46,7 +46,7 @@ const savedBotGameSchema = z.object({
   awayRoster: z.array(id).length(5),
   homeScore: z.number().int().min(0).max(42),
   awayScore: z.number().int().min(0).max(42),
-  history: z.array(gamePlaySchema).max(36)
+  history: z.array(gamePlaySchema).max(48)
 }).strict();
 
 export const userProgressSchema = z.object({

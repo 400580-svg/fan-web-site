@@ -34,13 +34,20 @@ type Props = {
 const slotLabels = ["Quarterback", "Running back", "Wide receiver 1", "Wide receiver 2", "Tight end"];
 const offenseOptions: { value: OffensiveCall; label: string; detail: string }[] = [
   { value: "run", label: "Inside run", detail: "Steady ground game; counter the blitz." },
+  { value: "power_run", label: "Power run", detail: "Attack downhill behind the blockers." },
+  { value: "outside_run", label: "Outside zone", detail: "Stretch the defense and find a lane." },
   { value: "quick_pass", label: "Quick pass", detail: "Fast timing route; punish soft coverage." },
+  { value: "screen_pass", label: "Screen pass", detail: "Get the ball out quickly and use blockers." },
   { value: "deep_pass", label: "Deep shot", detail: "Big-play chance; attack the secondary." }
 ];
 const defenseOptions: { value: DefensiveCall; label: string; detail: string }[] = [
   { value: "stack_box", label: "Stack the box", detail: "Crowd the line and make them throw." },
   { value: "zone", label: "Zone coverage", detail: "Protect the deep field and rally to the ball." },
-  { value: "blitz", label: "Bring pressure", detail: "Disrupt timing and force a quick decision." }
+  { value: "blitz", label: "Bring pressure", detail: "Disrupt timing and force a quick decision." },
+  { value: "man", label: "Man coverage", detail: "Match receivers one-on-one." },
+  { value: "prevent", label: "Prevent defense", detail: "Keep receivers in front and protect deep." },
+  { value: "qb_spy", label: "QB spy", detail: "Keep a defender ready for the quarterback." },
+  { value: "contain", label: "Edge contain", detail: "Set the edge and stop outside runs." }
 ];
 const allOffensiveCalls: OffensiveCall[] = offenseOptions.map(option => option.value);
 const allDefensiveCalls: DefensiveCall[] = defenseOptions.map(option => option.value);
@@ -329,7 +336,7 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn, onBo
       {currentStatus === "complete"
         ? <div className="game-result"><div className="eyebrow">Final score</div><h3>{winnerText}</h3><p>{currentState.homeScore}–{currentState.awayScore} after {drivesPerGame} possessions.</p><button className="primary-button" onClick={() => { setBotGame(null); setError(""); }}>Start another game</button></div>
         : <div className="game-call-area">
-          <div className="game-call-title"><span className="game-turn-kicker">POSSESSION {isSimulating && currentState.lastDrive ? currentState.lastDrive.driveNumber : currentState.drivesCompleted + 1} · PLAY {isSimulating && currentState.lastDrive ? currentState.lastDrive.playNumber : currentState.playsInDrive + 1} OF {playsPerDrive}</span><h3>{isSimulating ? "Watch the play unfold." : role === "offense" ? "Your team has the ball." : "You’re setting the defense."}</h3><p>{isSimulating ? "The ball is live. The result will appear in the play log." : role === "offense" ? "Choose a play to score. You have six plays before a turnover on downs." : "Choose a defensive call to stop the offense before it scores."}</p></div>
+          <div className="game-call-title"><span className="game-turn-kicker">POSSESSION {isSimulating && currentState.lastDrive ? currentState.lastDrive.driveNumber : currentState.drivesCompleted + 1} · PLAY {isSimulating && currentState.lastDrive ? currentState.lastDrive.playNumber : currentState.playsInDrive + 1} OF {playsPerDrive}</span><h3>{isSimulating ? "Watch the play unfold." : role === "offense" ? "Your team has the ball." : "You’re setting the defense."}</h3><p>{isSimulating ? "The ball is live. The result will appear in the play log." : role === "offense" ? `Choose a play to score. You have ${playsPerDrive} plays before a turnover on downs.` : "Choose a defensive call to stop the offense before it scores."}</p></div>
           <div className="game-call-grid">
             {(role === "offense" ? offenseOptions : defenseOptions).map(option => <button className="game-call-card" key={option.value} disabled={isSimulating} onClick={() => callBotPlay(option.value)}><span className="game-call-icon"><i /></span><b>{option.label}</b><small>{option.detail}</small><span className="game-call-arrow">CALL PLAY →</span></button>)}
           </div>
@@ -348,7 +355,7 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn, onBo
           {onlineGame.status === "complete"
             ? <div className="game-result"><div className="eyebrow">Final score</div><h3>{winnerText}</h3><p>{onlineGame.state.homeScore}–{onlineGame.state.awayScore} after {drivesPerGame} possessions.</p><button className="primary-button" onClick={() => { setOnlineGame(null); setMessage(""); }}>Find another match</button></div>
             : <div className="game-call-area">
-              <div className="game-call-title"><span className="game-turn-kicker">POSSESSION {isSimulating && onlineGame.state.lastDrive ? onlineGame.state.lastDrive.driveNumber : onlineGame.state.drivesCompleted + 1} · PLAY {isSimulating && onlineGame.state.lastDrive ? onlineGame.state.lastDrive.playNumber : onlineGame.state.playsInDrive + 1} OF {playsPerDrive} · {onlineGame.myRole?.toUpperCase()}</span><h3>{isSimulating ? "Watch the play unfold." : onlineGame.myMoveSubmitted ? "Your call is locked in." : onlineGame.myRole === "offense" ? "Your team has the ball." : "You’re setting the defense."}</h3><p>{isSimulating ? "The ball is live. The result will appear in the play log." : onlineGame.myMoveSubmitted ? "Waiting for the other player to make their call." : onlineGame.myRole === "offense" ? "Choose a play to score. You have six plays before a turnover on downs." : "Choose a defensive call to stop the offense before it scores."}</p></div>
+              <div className="game-call-title"><span className="game-turn-kicker">POSSESSION {isSimulating && onlineGame.state.lastDrive ? onlineGame.state.lastDrive.driveNumber : onlineGame.state.drivesCompleted + 1} · PLAY {isSimulating && onlineGame.state.lastDrive ? onlineGame.state.lastDrive.playNumber : onlineGame.state.playsInDrive + 1} OF {playsPerDrive} · {onlineGame.myRole?.toUpperCase()}</span><h3>{isSimulating ? "Watch the play unfold." : onlineGame.myMoveSubmitted ? "Your call is locked in." : onlineGame.myRole === "offense" ? "Your team has the ball." : "You’re setting the defense."}</h3><p>{isSimulating ? "The ball is live. The result will appear in the play log." : onlineGame.myMoveSubmitted ? "Waiting for the other player to make their call." : onlineGame.myRole === "offense" ? `Choose a play to score. You have ${playsPerDrive} plays before a turnover on downs.` : "Choose a defensive call to stop the offense before it scores."}</p></div>
               {onlineGame.myMoveSubmitted
                 ? <div className="game-waiting-opponent"><span className="game-live-dot" /> Waiting for opponent’s call…</div>
                 : <div className="game-call-grid">{(onlineGame.myRole === "offense" ? offenseOptions : defenseOptions).map(option => <button className="game-call-card" key={option.value} disabled={busy || isSimulating} onClick={() => void submitOnlineCall(option.value)}><span className="game-call-icon"><i /></span><b>{option.label}</b><small>{option.detail}</small><span className="game-call-arrow">CALL PLAY →</span></button>)}</div>}
@@ -368,7 +375,7 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn, onBo
 
     {error && currentStatus !== "none" && <div className="game-error" role="alert">{error}</div>}
     {message && <p className="game-status-message" role="status">{message}</p>}
-    <p className="game-rules-note">Player ratings influence each play’s yards. Every possession gives the offense up to six plays to score: a touchdown scores 7, and reaching field-goal range by play six earns 3. Otherwise, the ball turns over on downs. Matches last six possessions total. Bot games run in this tab; online games save every play and score to your account.</p>
+    <p className="game-rules-note">Choose from six offensive plays or seven defensive calls. Player ratings influence each snap. Every possession gives the offense up to {playsPerDrive} plays to score: a touchdown scores 7, and reaching field-goal range by the final play earns 3. Otherwise, the ball turns over on downs. Matches last six possessions total. Bot games run in this tab; online games save every play and score to your account.</p>
   </section>;
 }
 
@@ -382,8 +389,8 @@ function DriveFeed({
   teamLabel: (side: "home" | "away") => string;
 }) {
   if (!history.length) return null;
-  const callName: Record<OffensiveCall, string> = { run: "Inside run", quick_pass: "Quick pass", deep_pass: "Deep shot" };
-  const defenseName: Record<DefensiveCall, string> = { stack_box: "Stacked box", zone: "Zone", blitz: "Blitz" };
+  const callName: Record<OffensiveCall, string> = { run: "Inside run", power_run: "Power run", outside_run: "Outside zone", quick_pass: "Quick pass", screen_pass: "Screen pass", deep_pass: "Deep shot" };
+  const defenseName: Record<DefensiveCall, string> = { stack_box: "Stacked box", zone: "Zone", blitz: "Blitz", man: "Man coverage", prevent: "Prevent defense", qb_spy: "QB spy", contain: "Edge contain" };
   return <section className="game-drive-feed" aria-label="Play-by-play game log">
     <div className="game-feed-heading"><div><div className="eyebrow">Play-by-play</div><h3>Play log</h3></div><span>{history.length} PLAYS</span></div>
     {history.map((drive, index) => <article className="game-drive-row" key={`${index}-${drive.offense}-${drive.yards}`}>

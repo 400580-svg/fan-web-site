@@ -20,7 +20,7 @@ import { toPublicGame, type GameRecord } from "@/lib/game-server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const callSchema = z.enum(["run", "quick_pass", "deep_pass", "stack_box", "zone", "blitz"]);
+const callSchema = z.enum(["run", "power_run", "outside_run", "quick_pass", "screen_pass", "deep_pass", "stack_box", "zone", "blitz", "man", "prevent", "qb_spy", "contain"]);
 const requestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("join"), roster: z.array(z.string().min(1).max(120)).length(5) }).strict(),
   z.object({ action: z.literal("call"), call: callSchema, play: z.number().int().min(0).max(drivesPerGame * playsPerDrive - 1) }).strict(),
@@ -185,8 +185,8 @@ export async function POST(
     const mySide = row.host_user_id === userId ? "home" : "away";
     const role = state.currentOffense === mySide ? "offense" : "defense";
     const call = parsed.data.call as GameCall;
-    const offenseCalls: OffensiveCall[] = ["run", "quick_pass", "deep_pass"];
-    const defenseCalls: DefensiveCall[] = ["stack_box", "zone", "blitz"];
+    const offenseCalls: OffensiveCall[] = ["run", "power_run", "outside_run", "quick_pass", "screen_pass", "deep_pass"];
+    const defenseCalls: DefensiveCall[] = ["stack_box", "zone", "blitz", "man", "prevent", "qb_spy", "contain"];
     if (role === "offense" && !offenseCalls.includes(call as OffensiveCall)) {
       await client.query("ROLLBACK");
       return NextResponse.json({ error: "Choose an offensive play." }, { status: 400 });

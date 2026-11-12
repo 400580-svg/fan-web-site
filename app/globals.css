@@ -521,14 +521,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .sim-token-label { fill: white; font: 700 9px var(--font-mono); }
 .sim-defense-label { fill: #453400; font-size: 8px; }
 .sim-ball { opacity: .8; transform-box: fill-box; transform-origin: center; }
-.drive-simulation.is-animating.play-quick_pass .field-pass-arc,.drive-simulation.is-animating.play-deep_pass .field-pass-arc { opacity: 1; animation: pass-arc-show 1.5s ease-out both; }
+.drive-simulation.is-animating.play-quick_pass .field-pass-arc,.drive-simulation.is-animating.play-screen_pass .field-pass-arc,.drive-simulation.is-animating.play-deep_pass .field-pass-arc { opacity: 1; animation: pass-arc-show 1.5s ease-out both; }
 .drive-simulation.is-animating .sim-dl1,.drive-simulation.is-animating .sim-dl2,.drive-simulation.is-animating .sim-dl3,.drive-simulation.is-animating .sim-dl4,.drive-simulation.is-animating .sim-lb1,.drive-simulation.is-animating .sim-lb2 { animation: defense-close 1.25s ease-in-out both; }
 .drive-simulation.is-animating .sim-db1,.drive-simulation.is-animating .sim-s1 { animation: defense-track-up 1.25s ease-in-out both; }
 .drive-simulation.is-animating .sim-db2,.drive-simulation.is-animating .sim-s2 { animation: defense-track-down 1.25s ease-in-out both; }
-.drive-simulation.is-animating.play-run .sim-rb { animation: run-break 1.45s cubic-bezier(.15,.75,.35,1) both; }
-.drive-simulation.is-animating.play-run .sim-ball { animation: ball-run 1.25s ease-in-out both; }
-.drive-simulation.is-animating.play-quick_pass .sim-wr1,.drive-simulation.is-animating.play-quick_pass .sim-te { animation: quick-route 1.35s ease-out both; }
-.drive-simulation.is-animating.play-quick_pass .sim-ball,.drive-simulation.is-animating.play-deep_pass .sim-ball { animation: ball-pass 1.3s cubic-bezier(.15,.65,.3,1) both; }
+.drive-simulation.is-animating.play-run .sim-rb,.drive-simulation.is-animating.play-power_run .sim-rb,.drive-simulation.is-animating.play-outside_run .sim-rb { animation: run-break 1.45s cubic-bezier(.15,.75,.35,1) both; }
+.drive-simulation.is-animating.play-run .sim-ball,.drive-simulation.is-animating.play-power_run .sim-ball,.drive-simulation.is-animating.play-outside_run .sim-ball { animation: ball-run 1.25s ease-in-out both; }
+.drive-simulation.is-animating.play-quick_pass .sim-wr1,.drive-simulation.is-animating.play-quick_pass .sim-te,.drive-simulation.is-animating.play-screen_pass .sim-wr2,.drive-simulation.is-animating.play-screen_pass .sim-rb { animation: quick-route 1.35s ease-out both; }
+.drive-simulation.is-animating.play-quick_pass .sim-ball,.drive-simulation.is-animating.play-screen_pass .sim-ball,.drive-simulation.is-animating.play-deep_pass .sim-ball { animation: ball-pass 1.3s cubic-bezier(.15,.65,.3,1) both; }
 .drive-simulation.is-animating.play-deep_pass .sim-wr2 { animation: deep-route 1.55s ease-out both; }
 @keyframes team-follows-ball { from { translate: 0 0; } to { translate: var(--unit-gain) 0; } }
 @keyframes run-break { 0% { translate: 0 0; } 45% { translate: var(--unit-run-extra) -4px; } 100% { translate: var(--unit-run-extra) 0; } }

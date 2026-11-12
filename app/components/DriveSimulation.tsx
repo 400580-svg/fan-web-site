@@ -53,7 +53,10 @@ export default function DriveSimulation({ state, players, isAnimating }: Props) 
   const unitGain = gain * mirror;
   const unitDriveOffset = direction * driveProgressYards * 11.25 * mirror;
   const ballX = isAnimating ? ballStartX : ballEndX;
-  const targetY = lastDrive?.offenseCall === "deep_pass" ? -68 : lastDrive?.offenseCall === "quick_pass" ? -38 : 0;
+  const targetY = lastDrive?.offenseCall === "deep_pass" ? -68
+    : lastDrive?.offenseCall === "quick_pass" ? -32
+      : lastDrive?.offenseCall === "screen_pass" ? 42
+        : 0;
   const scoringLabel = lastDrive?.points === 7 ? "TOUCHDOWN" : lastDrive?.points === 3 ? "FIELD GOAL" : "";
   const scoringCallout = lastDrive?.points === 7 ? "TOUCHDOWN · +7" : lastDrive?.points === 3 ? "FIELD GOAL · +3" : lastDrive?.turnoverOnDowns ? "TURNOVER ON DOWNS" : "";
   const lineOfScrimmage = isAnimating ? ballStartX : ballX;
@@ -65,8 +68,11 @@ export default function DriveSimulation({ state, players, isAnimating }: Props) 
     : Math.min(state.playsInDrive + 1, playsPerDrive);
   const callLabel = lastDrive
     ? lastDrive.offenseCall === "run" ? "Inside run"
+      : lastDrive.offenseCall === "power_run" ? "Power run"
+        : lastDrive.offenseCall === "outside_run" ? "Outside zone"
       : lastDrive.offenseCall === "quick_pass" ? "Quick pass"
-        : "Deep shot"
+        : lastDrive.offenseCall === "screen_pass" ? "Screen pass"
+          : "Deep shot"
     : "Opening drive";
   const announcement = lastDrive
     ? `${callLabel}: ${lastDrive.possessionEnded && lastDrive.yards > 0 ? `${lastDrive.yards} yards on the final play. ` : ""}${lastDrive.message}`
