@@ -1,6 +1,6 @@
 "use client";
 
-import { useClerk, useUser } from "@clerk/nextjs";
+import { SignIn, useClerk, useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import PlayerComparisonCharts from "./components/PlayerComparisonCharts";
@@ -665,10 +665,42 @@ export default function Home() {
         <img src="/gridiron-mark.svg" alt="" width="48" height="48" />
         <div className="eyebrow">Gridiron Central account</div>
         <h1>{syncStatus === "error" ? "Progress could not sync" : "Loading your saved progress"}</h1>
-      <p>{syncStatus === "error" ? "Your account is signed in, but saved data could not be reached. Retry the sync or continue as a guest." : "Your playbook, team, favorites, and ratings are being loaded securely."}</p>
+      <p>{syncStatus === "error" ? "Your account is signed in, but saved data could not be reached. Retry syncing to open the game center." : "Your playbook, team, favorites, and ratings are being loaded securely."}</p>
         {syncStatus === "error"
-          ? <div className="account-loading-actions"><button className="primary-button" onClick={() => setSyncAttempt(value => value + 1)}>Retry sync</button><button className="secondary-button" onClick={() => void signOut({ redirectUrl: "/" })}>Continue as guest</button></div>
+          ? <div className="account-loading-actions"><button className="primary-button" onClick={() => setSyncAttempt(value => value + 1)}>Retry sync</button><button className="secondary-button" onClick={() => void signOut({ redirectUrl: "/" })}>Sign out</button></div>
           : <span className="sync-spinner" aria-label="Loading" />}
+      </section>
+    </main>;
+  }
+
+  if (!isLoaded) {
+    return <main className="account-loading-shell">
+      <section className="account-loading-card">
+        <img src="/gridiron-mark.svg" alt="" width="48" height="48" />
+        <div className="eyebrow">Gridiron Central</div>
+        <h1>Checking your account</h1>
+        <p>Sign in to enter the game center and keep your progress with you.</p>
+        <span className="sync-spinner" aria-label="Loading account" />
+      </section>
+    </main>;
+  }
+
+  if (!isSignedIn) {
+    return <main className="auth-layout">
+      <section className="auth-story">
+        <div className="auth-brand">
+          <img src="/gridiron-mark.svg" alt="" width="42" height="42" />
+          <span>GRIDIRON <b>CENTRAL</b></span>
+        </div>
+        <div className="auth-copy">
+          <div className="eyebrow">Your game center starts here</div>
+          <h1>Sign in before kickoff.</h1>
+          <p>Sign in or create an account to build your team, scout 2026 players, call plays, and save your progress across devices.</p>
+        </div>
+        <div className="auth-back">NFL fan analysis, team building, and simulated games.</div>
+      </section>
+      <section className="auth-form-panel">
+        <SignIn routing="hash" signUpUrl="/sign-up" />
       </section>
     </main>;
   }
