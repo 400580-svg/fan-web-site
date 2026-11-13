@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   averageRosterRating,
+  botDifficultySettings,
   counterDefense,
   counterOffense,
   createGameState,
@@ -17,6 +18,7 @@ import {
   validateDefenseRoster,
   validateGameRoster,
   type DefensiveCall,
+  type BotDifficulty,
   type GameCall,
   type GameState,
   type OffensiveCall
@@ -56,6 +58,11 @@ const defenseOptions: { value: DefensiveCall; label: string; detail: string }[] 
 ];
 const allOffensiveCalls: OffensiveCall[] = offenseOptions.map(option => option.value);
 const allDefensiveCalls: DefensiveCall[] = defenseOptions.map(option => option.value);
+const difficultyOptions: { value: BotDifficulty; label: string; detail: string }[] = [
+  { value: "rookie", label: "Rookie", detail: "Weaker roster and fewer counters." },
+  { value: "pro", label: "Pro", detail: "Top roster with balanced play calls." },
+  { value: "all_pro", label: "All-Pro", detail: "Top roster and frequent counters." }
+];
 
 async function apiRequest<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -80,6 +87,7 @@ function scoreLabel(home: number, away: number, mySide: "home" | "away") {
 
 export default function PlayCallingGame({ players, teamPlayers, isSignedIn, onBotGameComplete, onSaveTeamRoster }: Props) {
   const [mode, setMode] = useState<"bot" | "online">("bot");
+  const [botDifficulty, setBotDifficulty] = useState<BotDifficulty>("pro");
   const [rosterIds, setRosterIds] = useState(() => getRecommendedRoster(players, teamPlayers));
   const [defenseRosterIds, setDefenseRosterIds] = useState(() => getRecommendedDefenseRoster(players, teamPlayers));
   const [botGame, setBotGame] = useState<GameState | null>(null);
@@ -119,8 +127,9 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn, onBo
       setError(rosterError);
       return;
     }
-    const botRoster = getRecommendedRoster(players, [], rosterIds);
-    const botDefenseRoster = getRecommendedDefenseRoster(players, [], [...rosterIds, ...defenseRosterIds, ...botRoster]);
+    const rosterQuality = botDifficultySettings[botDifficulty].rosterQuality;
+    const botRoster = getRecommendedRoster(players, [], rosterIds, rosterQuality);
+    const botDefenseRoster = getRecommendedDefenseRoster(players, [], [...rosterIds, ...defenseRosterIds, ...botRoster], rosterQuality);
     setBotGameId(crypto.randomUUID());
     setBotGameCreatedAt(new Date().toISOString());
     setBotGame(createGameState(rosterIds, botRoster, defenseRosterIds, botDefenseRoster));
@@ -131,14 +140,15 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn, onBo
 
   const callBotPlay = (call: GameCall) => {
     if (!botGame || botGame.drivesCompleted >= drivesPerGame) return;
+    const counterChance = botDifficultySettings[botDifficulty].counterChance;
     const userIsOffense = botGame.currentOffense === "home";
     const offenseCall = userIsOffense
       ? call as OffensiveCall
-      : Math.random() < 0.65
+      : Math.random() < counterChance
         ? counterOffense(call as DefensiveCall)
         : allOffensiveCalls[Math.floor(Math.random() * allOffensiveCalls.length)];
     const defenseCall = userIsOffense
-      ? Math.random() < 0.65
+      ? Math.random() < counterChance
         ? counterDefense(call as OffensiveCall)
         : allDefensiveCalls[Math.floor(Math.random() * allDefensiveCalls.length)]
       : call as DefensiveCall;
@@ -295,6 +305,7 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn, onBo
   const winnerText = currentState && currentStatus === "complete"
     ? scoreLabel(currentState.homeScore, currentState.awayScore, mySide)
     : "";
+  const selectedDifficulty = difficultyOptions.find(option => option.value === botDifficulty)!;
 
   const renderRosterNames = (ids: string[]) => ids.map(id => players.find(player => player.id === id)?.name || "Player").join(" · ");
   const renderScoreboard = (state: GameState | Omit<GameState, "pending">) => (
@@ -318,6 +329,18 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn, onBo
 
     {currentStatus === "none" && <section className="game-roster-panel">
       <div className="game-panel-heading"><div><div className="eyebrow">Build your team</div><h3>Choose your offense and defense</h3><p>Set five offensive starters, then choose a DE, DT, linebacker, cornerback, and safety.</p></div><span className="game-roster-rating">{averageRosterRating([...rosterIds, ...defenseRosterIds], players).toFixed(1)}<small> / 5 team stars</small></span></div>
+      {mode === "bot" && <div className="game-difficulty">
+        <div className="game-difficulty-heading"><b>BOT DIFFICULTY</b><span>Choose how challenging the computer opponent plays.</span></div>
+        <div className="game-difficulty-options" role="group" aria-label="Choose bot difficulty">
+          {difficultyOptions.map(option => <button
+            type="button"
+            key={option.value}
+            className={`game-difficulty-card ${botDifficulty === option.value ? "active" : ""}`}
+            aria-pressed={botDifficulty === option.value}
+            onClick={() => setBotDifficulty(option.value)}
+          ><b>{option.label}</b><span>{option.detail}</span></button>)}
+        </div>
+      </div>}
       <div className="game-roster-subhead"><b>OFFENSE</b><span>QB · RB · 2 WR · TE</span></div>
       <div className="game-roster-slots">
         {rosterSlots.map((position, index) => {
@@ -365,13 +388,14 @@ export default function PlayCallingGame({ players, teamPlayers, isSignedIn, onBo
         <div className="section-sub">{rosterError || "Only players with verified 2026 statistics are eligible."}</div>
       </div>
       {mode === "bot"
-        ? <button className="primary-button game-start-button" disabled={Boolean(rosterError)} onClick={startBotGame}>Start game vs bot <span>→</span></button>
+        ? <button className="primary-button game-start-button" disabled={Boolean(rosterError)} onClick={startBotGame}>Start game vs {selectedDifficulty.label} bot <span>→</span></button>
         : isSignedIn
           ? <button className="primary-button game-start-button" disabled={Boolean(rosterError) || busy} onClick={() => void createOnlineGame()}>{busy ? "Opening match…" : "Create an open match"} <span>→</span></button>
           : <div className="game-signin-note">Sign in to play another fan. <Link href="/sign-in">Sign in</Link> or <Link href="/sign-up">create an account</Link>.</div>}
     </section>}
 
     {mode === "bot" && currentStatus !== "none" && currentState && <section className="game-match-panel">
+      <div className="game-match-difficulty"><span className="game-live-dot" /> {selectedDifficulty.label} BOT MATCH</div>
       {renderScoreboard(currentState)}
       <DriveSimulation state={currentState} players={players} isAnimating={isSimulating} />
       {currentStatus === "complete"

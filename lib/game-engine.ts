@@ -7,9 +7,17 @@ export const drivesPerGame = 6;
 export const playsPerDrive = 8;
 
 export type GameSide = "home" | "away";
+export type BotDifficulty = "rookie" | "pro" | "all_pro";
+export type RosterQuality = "best" | "weaker";
 export type OffensiveCall = "run" | "power_run" | "outside_run" | "quick_pass" | "screen_pass" | "deep_pass";
 export type DefensiveCall = "stack_box" | "zone" | "blitz" | "man" | "prevent" | "qb_spy" | "contain";
 export type GameCall = OffensiveCall | DefensiveCall;
+
+export const botDifficultySettings: Record<BotDifficulty, { counterChance: number; rosterQuality: RosterQuality }> = {
+  rookie: { counterChance: 0.25, rosterQuality: "weaker" },
+  pro: { counterChance: 0.6, rosterQuality: "best" },
+  all_pro: { counterChance: 0.9, rosterQuality: "best" }
+};
 
 export type PlaySummary = {
   driveNumber: number;
@@ -71,12 +79,16 @@ export function normalizeGameState(state: GameState): GameState {
 export function getRecommendedRoster(
   players: readonly PlayerProfile[],
   preferredIds: readonly string[] = [],
-  excludedIds: readonly string[] = []
+  excludedIds: readonly string[] = [],
+  quality: RosterQuality = "best"
 ): string[] {
   const ratings = calculate2026SiteRatings(players);
   const available = players
     .filter(player => ratings[player.id] !== null && !excludedIds.includes(player.id))
-    .sort((a, b) => (ratings[b.id] || 0) - (ratings[a.id] || 0) || a.name.localeCompare(b.name));
+    .sort((a, b) => {
+      const difference = (ratings[b.id] || 0) - (ratings[a.id] || 0);
+      return (quality === "best" ? difference : -difference) || a.name.localeCompare(b.name);
+    });
   const used = new Set<string>();
   const roster: string[] = [];
 
@@ -97,12 +109,16 @@ export function getRecommendedRoster(
 export function getRecommendedDefenseRoster(
   players: readonly PlayerProfile[],
   preferredIds: readonly string[] = [],
-  excludedIds: readonly string[] = []
+  excludedIds: readonly string[] = [],
+  quality: RosterQuality = "best"
 ): string[] {
   const ratings = calculate2026SiteRatings(players);
   const available = players
     .filter(player => ratings[player.id] !== null && !excludedIds.includes(player.id))
-    .sort((a, b) => (ratings[b.id] || 0) - (ratings[a.id] || 0) || a.name.localeCompare(b.name));
+    .sort((a, b) => {
+      const difference = (ratings[b.id] || 0) - (ratings[a.id] || 0);
+      return (quality === "best" ? difference : -difference) || a.name.localeCompare(b.name);
+    });
   const used = new Set<string>();
   const roster: string[] = [];
 
