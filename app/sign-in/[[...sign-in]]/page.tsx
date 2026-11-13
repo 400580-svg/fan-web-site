@@ -12,7 +12,7 @@ export default function SignInPage() {
         <div className="auth-copy">
           <div className="eyebrow">Your film room, saved</div>
           <h1>Pick up where the game left off.</h1>
-          <p>Sign in to keep your custom plays, lineups, favorites, and player ratings available on your other devices.</p>
+          <p>Sign in to keep your team, favorite players, ratings, and game history available across devices.</p>
         </div>
         <Link className="auth-back" href="/">← Back to Gridiron Central</Link>
       </section>

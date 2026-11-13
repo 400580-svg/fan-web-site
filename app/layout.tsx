@@ -64,7 +64,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             signUp: {
               start: {
                 title: "Create your fan account",
-                subtitle: "Save your playbook, lineups, and favorites."
+                subtitle: "Save your team, favorites, and game history."
               }
             }
           }}

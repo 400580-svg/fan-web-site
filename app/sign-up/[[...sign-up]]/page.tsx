@@ -10,9 +10,9 @@ export default function SignUpPage() {
           <span>GRIDIRON <b>CENTRAL</b></span>
         </Link>
         <div className="auth-copy">
-          <div className="eyebrow">Build your own playbook</div>
+          <div className="eyebrow">Join the fan huddle</div>
           <h1>Your football work, all in one place.</h1>
-          <p>Create an account to save your lineups, playbook, and player favorites across sessions and devices.</p>
+          <p>Create an account to save your team, player favorites, and game history across sessions and devices.</p>
         </div>
         <Link className="auth-back" href="/">← Back to Gridiron Central</Link>
       </section>
