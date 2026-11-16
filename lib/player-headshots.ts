@@ -1,0 +1,47 @@
+const espnAthleteIds: Record<string, string> = {
+  "Jordan Love": "4036378",
+  "Joe Burrow": "3915511",
+  "Dak Prescott": "2577417",
+  "Matthew Stafford": "12483",
+  "Kirk Cousins": "14880",
+  "Drake Maye": "4431452",
+  "C.J. Stroud": "4432577",
+  "Bryce Young": "4685720",
+  "Jared Goff": "3046779",
+  "Geno Smith": "15864",
+  "Bijan Robinson": "4430807",
+  "Kenneth Walker III": "4567048",
+  "Jahmyr Gibbs": "4429795",
+  "Bucky Irving": "4596448",
+  "James Cook III": "4379399",
+  "Jaylen Warren": "4569987",
+  "Derrick Henry": "3043078",
+  "Jonathan Taylor": "4242335",
+  "Javonte Williams": "4361579",
+  "Chuba Hubbard": "4241416",
+  "Jaxon Smith-Njigba": "4430878",
+  "CeeDee Lamb": "4241389",
+  "Christian Watson": "4248528",
+  "Matthew Golden": "4701936",
+  "Tee Higgins": "4239993",
+  "Chris Olave": "4361370",
+  "Puka Nacua": "4426515",
+  "Drake London": "4426502",
+  "Amon-Ra St. Brown": "4374302",
+  "Malik Nabers": "4595348",
+  "Brock Bowers": "4432665",
+  "Trey McBride": "4361307",
+  "George Kittle": "3040151",
+  "Travis Kelce": "15847",
+  "Harold Fannin Jr.": "5083076",
+  "Isaiah Likely": "4361050",
+  "Dalton Kincaid": "4385690",
+  "Sam LaPorta": "4430027",
+  "Michael Mayer": "4429086",
+  "Dalton Schultz": "3117256"
+};
+
+export function getPlayerHeadshot(name: string) {
+  const athleteId = espnAthleteIds[name];
+  return athleteId ? `https://a.espncdn.com/i/headshots/nfl/players/full/${athleteId}.png` : null;
+}

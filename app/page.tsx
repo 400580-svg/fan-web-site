@@ -5,17 +5,20 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import PlayerComparisonCharts from "./components/PlayerComparisonCharts";
 import { UserProgress, userProgressSchema, type SavedBotGame } from "@/lib/progress";
-import { leaderboardConfig, topTenPlayers2026, type LeaderboardPosition } from "@/lib/top-ten-2026";
+import { leaderboardConfig, type LeaderboardPosition } from "@/lib/top-ten-2026";
+import { getPlayerHeadshot } from "@/lib/player-headshots";
 import { calculate2026SiteRatings, getSiteRatingMetric, type SitePlayerRating } from "@/lib/player-ratings";
 import { seasonPlayers, type PlayerProfile as Player } from "@/lib/player-directory";
 import { defenseStatsUrl } from "@/lib/defense-2026";
 import PlayCallingGame from "./components/PlayCallingGame";
 import GameHistory from "./components/GameHistory";
 
-type View = "Overview" | "Players" | "Game day" | "Matchup lab" | "Top 10" | "My Team" | "Game history";
+type View = "Overview" | "Players" | "Game day" | "Matchup lab" | "Photo gallery" | "My Team" | "Game history";
 type Play = { id: string; name: string; formation: string; personnel: string; concept: string; situation: string; note: string; tags?: string[] };
 type Lineup = { id: string; name: string; format: string; quarterback: string; runningBack: string; receiver: string; tightEnd: string; note: string };
 type ModalState = { kind: "play" | "lineup"; item?: Play | Lineup } | null;
+type MatchupTeam = { id: string; abbreviation: string; name: string; logo: string | null; record: string | null };
+type UpcomingMatchup = { id: string; startsAt: string; venue: string | null; status: string; homeTeam: MatchupTeam; awayTeam: MatchupTeam; sourceUrl: string };
 
 const statsSourceUrl = "https://www.nfl.com/stats/player-stats";
 const statsCheckedAt = "November 9, 2026";
@@ -101,6 +104,16 @@ function playerStatRows(player: Player) {
     { label: "Receptions", value: String(player.receptions ?? 0) },
     { label: "Rec TD", value: String(player.receivingTouchdowns ?? 0) }
   ];
+}
+function formatKickoff(isoDate: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short"
+  }).format(new Date(isoDate));
 }
 const demoPlays: Play[] = [
   { id: "d1", name: "Blue Orbit", formation: "Gun Trips Right", personnel: "11 personnel", concept: "Choice / Sail", situation: "2nd & medium", note: "Read the nickel leverage. Alert the boundary fade if the safety rotates down.", tags: ["quick game", "coverage read"] },
@@ -254,6 +267,10 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [position, setPosition] = useState("All positions");
   const [leaderboardPosition, setLeaderboardPosition] = useState<LeaderboardPosition>("QB");
+  const [upcomingMatchup, setUpcomingMatchup] = useState<UpcomingMatchup | null>(null);
+  const [matchupLoading, setMatchupLoading] = useState(true);
+  const [matchupError, setMatchupError] = useState("");
+  const [matchupReload, setMatchupReload] = useState(0);
   const [selected, setSelected] = useState<string[]>(["p1", "p2"]);
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [modal, setModal] = useState<ModalState>(null);
@@ -291,6 +308,30 @@ export default function Home() {
     else if (requestedView === "team") setView("My Team");
     else if (requestedView === "history") setView("Game history");
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setMatchupLoading(true);
+    setMatchupError("");
+    fetch("/api/upcoming-matchup", { cache: "no-store" })
+      .then(async response => {
+        const result = await response.json() as UpcomingMatchup | { error?: string };
+        if (!response.ok) throw new Error("error" in result ? result.error : "The NFL schedule is unavailable.");
+        return result as UpcomingMatchup;
+      })
+      .then(result => {
+        if (!cancelled) setUpcomingMatchup(result);
+      })
+      .catch(error => {
+        if (cancelled) return;
+        setUpcomingMatchup(null);
+        setMatchupError(error instanceof Error ? error.message : "The NFL schedule is unavailable.");
+      })
+      .finally(() => {
+        if (!cancelled) setMatchupLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [matchupReload]);
 
   const progressSnapshot = useMemo<UserProgress>(() => ({
     version: 1,
@@ -654,7 +695,7 @@ export default function Home() {
   const isEditing = Boolean(modal?.item);
 
   const navItems: { title: View; icon: string }[] = [
-    { title: "Overview", icon: "grid" }, { title: "Players", icon: "users" }, { title: "Game day", icon: "play" }, { title: "Matchup lab", icon: "compare" }, { title: "Top 10", icon: "trend" }, { title: "My Team", icon: "lineup" }, { title: "Game history", icon: "history" }
+    { title: "Overview", icon: "grid" }, { title: "Players", icon: "users" }, { title: "Game day", icon: "play" }, { title: "Matchup lab", icon: "compare" }, { title: "Photo gallery", icon: "trend" }, { title: "My Team", icon: "lineup" }, { title: "Game history", icon: "history" }
   ];
   const syncLabel = !isLoaded
     ? "CHECKING ACCOUNT"
@@ -736,7 +777,7 @@ export default function Home() {
           <div className="section-head"><div><div className="eyebrow">The lay of the land</div><h2>Sunday, at a glance</h2></div><button className="text-button" onClick={() => goto("Players")}>Explore player directory <Icon name="arrow" size={14} /></button></div>
           <div className="stat-strip">
             <div className="stat-card"><div><div className="stat-label">Player profiles</div><div className="stat-value">{players.length}</div><div className="stat-meta">2026 SEASON SNAPSHOT</div></div><div className="stat-mark"><Icon name="users" size={16} /></div></div>
-            <div className="stat-card"><div><div className="stat-label">Top 10 leaders</div><div className="stat-value">{leaderboardPlayers.length}</div><div className="stat-meta">CURRENT POSITION</div></div><div className="stat-mark"><Icon name="trend" size={16} /></div></div>
+            <div className="stat-card"><div><div className="stat-label">Gallery players</div><div className="stat-value">{leaderboardPlayers.length}</div><div className="stat-meta">CURRENT POSITION</div></div><div className="stat-mark"><Icon name="trend" size={16} /></div></div>
             <div className="stat-card"><div><div className="stat-label">Current team</div><div className="stat-value">{teamPlayers.length}</div><div className="stat-meta">SAVED PLAYERS</div></div><div className="stat-mark"><Icon name="lineup" size={16} /></div></div>
             <div className="stat-card"><div><div className="stat-label">Your favorites</div><div className="stat-value">{favorites.length}</div><div className="stat-meta">SAVED PLAYERS</div></div><div className="stat-mark"><Icon name="star" size={16} /></div></div>
           </div>
@@ -755,9 +796,25 @@ export default function Home() {
             </div>
           </section>
           <div className="dashboard-grid">
-            <section className="panel"><header className="panel-header"><div><div className="panel-title">Matchup of the week</div><div className="panel-caption">A sample tactical prompt to get your film session started.</div></div><span className="panel-tag">FEATURED</span></header>
-              <div className="matchup-feature"><div className="team-side"><div className="team-badge">LAC</div><div><div className="team-meta">AFC WEST</div><div className="team-name">Chargers</div><div className="team-detail">Justin Herbert · QB</div></div></div><div className="versus">VS</div><div className="team-side right"><div className="team-badge">KC</div><div><div className="team-meta">AFC WEST</div><div className="team-name">Chiefs</div><div className="team-detail">Patrick Mahomes · QB</div></div></div></div>
-              <div className="match-foot"><small>Focus: pressure answers &amp; coverage rotation</small><button className="thin-button" onClick={() => { setSelected(["p1", "p2"]); goto("Matchup lab"); setComparisonOpen(true); }}>Break it down <Icon name="arrow" size={12} /></button></div>
+            <section className="panel"><header className="panel-header"><div><div className="panel-title">Matchup of the week</div><div className="panel-caption">{matchupLoading ? "Loading the next scheduled game…" : "Next scheduled NFL game · Schedule from ESPN."}</div></div><span className="panel-tag">NEXT GAME</span></header>
+              {matchupLoading
+                ? <div className="matchup-message" role="status">Finding the next game…</div>
+                : matchupError || !upcomingMatchup
+                  ? <div className="matchup-message matchup-error" role="alert"><span>{matchupError || "No upcoming game is available."}</span><button className="thin-button" onClick={() => setMatchupReload(value => value + 1)}>Try again</button></div>
+                  : <>
+                    <div className="matchup-feature">
+                      <div className="team-side">
+                        <div className="team-badge matchup-logo">{upcomingMatchup.awayTeam.logo ? <img src={upcomingMatchup.awayTeam.logo} alt="" onError={event => event.currentTarget.remove()} /> : upcomingMatchup.awayTeam.abbreviation}</div>
+                        <div><div className="team-meta">AWAY · {upcomingMatchup.awayTeam.abbreviation}</div><div className="team-name">{upcomingMatchup.awayTeam.name}</div><div className="team-detail">{upcomingMatchup.awayTeam.record ? `${upcomingMatchup.awayTeam.record} record` : "Record unavailable"}</div></div>
+                      </div>
+                      <div className="versus">@</div>
+                      <div className="team-side right">
+                        <div className="team-badge matchup-logo">{upcomingMatchup.homeTeam.logo ? <img src={upcomingMatchup.homeTeam.logo} alt="" onError={event => event.currentTarget.remove()} /> : upcomingMatchup.homeTeam.abbreviation}</div>
+                        <div><div className="team-meta">HOME · {upcomingMatchup.homeTeam.abbreviation}</div><div className="team-name">{upcomingMatchup.homeTeam.name}</div><div className="team-detail">{upcomingMatchup.homeTeam.record ? `${upcomingMatchup.homeTeam.record} record` : "Record unavailable"}</div></div>
+                      </div>
+                    </div>
+                    <div className="match-foot"><small>{formatKickoff(upcomingMatchup.startsAt)}{upcomingMatchup.venue ? ` · ${upcomingMatchup.venue}` : ""} · <a href={upcomingMatchup.sourceUrl} target="_blank" rel="noreferrer">ESPN schedule</a></small><button className="thin-button" onClick={() => { setQuery(""); goto("Players"); }}>Browse players <Icon name="arrow" size={12} /></button></div>
+                  </>}
             </section>
             <section className="panel"><header className="panel-header"><div><div className="panel-title">Player snapshots</div><div className="panel-caption">2026 regular-season lines from the directory.</div></div><Icon name="trend" size={17} /></header><div className="trend-card">
               {players.filter(player => player.games > 0).slice(0, 3).map(player => {
@@ -796,12 +853,12 @@ export default function Home() {
           </div>
           <div className="section-head"><div><div className="eyebrow">Get into the details</div><h2>Choose your angle</h2></div></div>
           <div className="stat-strip">
-            {[["Player directory", "Search the 2026 player pool by name, position, or team.", "Players", "users"], ["Top 10 leaderboard", "Browse the season leaders by player position.", "Top 10", "trend"], ["Your current team", "See every player you have added from the directory.", "My Team", "lineup"], ["Your game history", "Review your completed bot and online matches.", "Game history", "history"]].map(([title, desc, destination, icon]) => <button className="stat-card" key={title} onClick={() => goto(destination as View)} style={{ textAlign: "left", width: "100%", border: "1px solid var(--line)" }}><div><div className="stat-label">{title}</div><div className="section-sub" style={{ maxWidth: 195, lineHeight: 1.45 }}>{desc}</div></div><div className="stat-mark"><Icon name={icon} size={16} /></div></button>)}
+            {[["Player directory", "Search the 2026 player pool by name, position, or team.", "Players", "users"], ["Player photo gallery", "Browse the leading players by position.", "Photo gallery", "trend"], ["Your current team", "See every player you have added from the directory.", "My Team", "lineup"], ["Your game history", "Review your completed bot and online matches.", "Game history", "history"]].map(([title, desc, destination, icon]) => <button className="stat-card" key={title} onClick={() => goto(destination as View)} style={{ textAlign: "left", width: "100%", border: "1px solid var(--line)" }}><div><div className="stat-label">{title}</div><div className="section-sub" style={{ maxWidth: 195, lineHeight: 1.45 }}>{desc}</div></div><div className="stat-mark"><Icon name={icon} size={16} /></div></button>)}
           </div>
         </>}
 
         {view === "Players" && <section className="section-layout">
-          <div className="section-head" style={{ marginTop: 4 }}><div><div className="eyebrow">The player pool</div><h2>Player directory</h2><div className="section-sub">Search and add players below, or visit the Top 10 leaderboard. <a href={statsSourceUrl} target="_blank" rel="noreferrer">NFL.com player stats</a></div></div><button className="primary-button" onClick={() => { if (selected.length !== 2) { setToast("Select exactly two players to compare."); return; } setComparisonOpen(true); }}>Compare selected <Icon name="compare" size={14} /> {selected.length}/2</button></div>
+          <div className="section-head" style={{ marginTop: 4 }}><div><div className="eyebrow">The player pool</div><h2>Player directory</h2><div className="section-sub">Search and add players below, or visit the photo gallery. <a href={statsSourceUrl} target="_blank" rel="noreferrer">NFL.com player stats</a></div></div><button className="primary-button" onClick={() => { if (selected.length !== 2) { setToast("Select exactly two players to compare."); return; } setComparisonOpen(true); }}>Compare selected <Icon name="compare" size={14} /> {selected.length}/2</button></div>
           <div className="directory-toolbar-title"><div className="eyebrow">Search the player pool</div><span>{players.length} players · Add any result to your team</span></div>
           <div className="section-toolbar">
             <label className="search-box"><Icon name="search" size={15} /><input aria-label="Search players" placeholder="Search players, teams, or positions..." value={query} onChange={event => setQuery(event.target.value)} /></label>
@@ -879,28 +936,38 @@ export default function Home() {
           <div className="analysis-grid">{experts.map((expert, index) => <article className="analyst-card" key={expert.name}><div className="analyst-top"><span className="analyst-number">0{index + 1}</span><div><div className="analyst-name">{expert.name}</div><div className="analyst-role">{expert.role}</div></div></div><p>{expert.text}</p><div className="analyst-pick">Key read <b>{expert.pick}</b></div></article>)}</div>
         </section>}
 
-        {view === "Top 10" && <section className="section-layout">
-          <div className="section-head" style={{ marginTop: 4 }}><div><div className="eyebrow">2026 season leaders</div><h2>Top 10 leaderboard</h2><div className="section-sub">Browse the ten best statistical leaders at each position.</div></div></div>
+        {view === "Photo gallery" && <section className="section-layout">
+          <div className="section-head" style={{ marginTop: 4 }}><div><div className="eyebrow">2026 season leaders</div><h2>Player photo gallery</h2><div className="section-sub">Browse the top ten statistical performers at a position, with player photos and season stats.</div></div></div>
           <section className="leaderboard-panel" aria-labelledby="leaderboard-title">
             <div className="leaderboard-header">
-              <div><div className="eyebrow">Position rankings</div><h3 id="leaderboard-title">Top 10 · {leaderboardConfig[leaderboardPosition].label}</h3><p>Position-specific 2026 regular-season yardage leaders.</p></div>
+              <div><div className="eyebrow">Position gallery</div><h3 id="leaderboard-title">{leaderboardConfig[leaderboardPosition].label}</h3><p>Position-specific 2026 regular-season leaders, ranked by {leaderboardConfig[leaderboardPosition].metric.toLowerCase()}.</p></div>
               <div className="position-tabs" role="group" aria-label="Choose a player position">
                 {(["QB", "RB", "WR", "TE"] as const).map(positionCode => <button key={positionCode} aria-pressed={leaderboardPosition === positionCode} className={leaderboardPosition === positionCode ? "active" : ""} onClick={() => setLeaderboardPosition(positionCode)}><b>{positionCode}</b><span>{leaderboardConfig[positionCode].label}</span></button>)}
               </div>
             </div>
-            <div className="leaderboard-rows" aria-live="polite" aria-label={`${leaderboardConfig[leaderboardPosition].label} top ten`}>
+            <div className="player-gallery-grid" aria-live="polite" aria-label={`${leaderboardConfig[leaderboardPosition].label} top ten players`}>
               {leaderboardPlayers.map(player => {
                 const stat = leaderboardStat(player);
                 const onTeam = teamPlayers.includes(player.id);
-                return <div className="leaderboard-row" key={player.id}>
-                  <span className="leaderboard-rank">{String(player.positionRank).padStart(2, "0")}</span>
-                  <button className="leaderboard-name" onClick={() => openPlayer(player)}>{player.name}<small>{player.team}</small></button>
-                  <div className="leaderboard-stat"><b>{stat.value}</b><small>{stat.label}</small><SiteRatingDisplay rating={siteRatings[player.id] ?? null} position={player.position} compact /></div>
-                  <button className={`team-player-button leaderboard-add ${onTeam ? "is-added" : ""}`} aria-pressed={onTeam} onClick={() => toggleTeamPlayer(player.id)}><Icon name={onTeam ? "close" : "plus"} size={12} />{onTeam ? "On your team" : "Add to team"}</button>
-                </div>;
+                const initials = player.name.split(/\s+/).map(part => part[0]).slice(0, 2).join("");
+                const headshot = getPlayerHeadshot(player.name);
+                return <article className="player-gallery-card" key={player.id}>
+                  <button className="player-gallery-photo" onClick={() => openPlayer(player)} aria-label={`Open ${player.name}'s player profile`}>
+                    <span className="player-gallery-fallback" aria-hidden="true">{initials}</span>
+                    {headshot && <img src={headshot} alt="" loading="lazy" onError={event => event.currentTarget.remove()} />}
+                    <span className="gallery-rank">#{String(player.positionRank).padStart(2, "0")}</span>
+                  </button>
+                  <div className="player-gallery-body">
+                    <button className="player-gallery-name" onClick={() => openPlayer(player)}>{player.name}</button>
+                    <div className="player-gallery-team">{player.team}</div>
+                    <div className="player-gallery-stat"><span>{stat.label}</span><b>{stat.value}</b></div>
+                    <SiteRatingDisplay rating={siteRatings[player.id] ?? null} position={player.position} compact />
+                    <button className={`team-player-button player-gallery-add ${onTeam ? "is-added" : ""}`} aria-pressed={onTeam} onClick={() => toggleTeamPlayer(player.id)}><Icon name={onTeam ? "close" : "plus"} size={12} />{onTeam ? "On your team" : "Add to team"}</button>
+                  </div>
+                </article>;
               })}
             </div>
-            <div className="leaderboard-source">Ranked by {leaderboardConfig[leaderboardPosition].metric} · Stats checked {statsCheckedAt} · Snapshot does not update automatically · <a href={leaderboardConfig[leaderboardPosition].sourceUrl} target="_blank" rel="noreferrer">StatMuse source</a></div>
+            <div className="leaderboard-source">Ranked by {leaderboardConfig[leaderboardPosition].metric} · Stats checked {statsCheckedAt} · Player headshots provided by ESPN; players without a verified photo show initials · <a href={leaderboardConfig[leaderboardPosition].sourceUrl} target="_blank" rel="noreferrer">StatMuse stats source</a></div>
             <div className="rating-explanation">Site ratings compare each position’s 2026 production. Players without verified stats remain unrated; the displayed rankings are sourced snapshots, not live feeds.</div>
           </section>
         </section>}
