@@ -1,0 +1,17 @@
+/* Site-wide Chargers background image */
+body {
+  background:
+    linear-gradient(rgba(239,248,252,.78), rgba(239,248,252,.86)),
+    url("https://yt3.googleusercontent.com/ytc/AIdro_nWjUzXng4KFtjjqWmmjM92FWKjR7VV5iGm9iYCqwUQeQk=s900-c-k-c0x00ffffff-no-rj")
+    center / cover no-repeat fixed var(--paper);
+}
+.auth-layout,
+.account-loading-shell {
+  background: transparent;
+}
+.auth-form-panel {
+  background: transparent;
+}
+.dark-mode .main {
+  background: rgba(12,20,34,.86);
+}

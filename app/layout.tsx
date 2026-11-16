@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { headers } from "next/headers";
 import "./globals.css";
+import "./background.css";
 
 export const metadata: Metadata = {
   title: "Gridiron Central — See the game differently",
