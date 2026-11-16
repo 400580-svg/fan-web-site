@@ -271,7 +271,7 @@ export default function Home() {
   const [matchupLoading, setMatchupLoading] = useState(true);
   const [matchupError, setMatchupError] = useState("");
   const [matchupReload, setMatchupReload] = useState(0);
-  const [selected, setSelected] = useState<string[]>(["p1", "p2"]);
+  const [selected, setSelected] = useState<string[]>(["p1", "p3"]);
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [modal, setModal] = useState<ModalState>(null);
   const [toast, setToast] = useState("");
@@ -557,7 +557,7 @@ export default function Home() {
   const chargersPercent = totalPollVotes ? Math.round(pollVotes.chargers / totalPollVotes * 100) : 0;
   const chiefsPercent = totalPollVotes ? 100 - chargersPercent : 0;
   const comparePlayers = selected.map(id => players.find(player => player.id === id)).filter((player): player is Player => Boolean(player));
-  const chartPlayers = comparePlayers.length === 2 ? comparePlayers : players.slice(0, 2);
+  const chartPlayers = comparePlayers.length === 2 ? comparePlayers : [players[0], players[2]].filter((player): player is Player => Boolean(player));
   const openEditor = (kind: "play" | "lineup", item?: Play | Lineup) => {
     setFormError("");
     setModal({ kind, item });
@@ -930,7 +930,7 @@ export default function Home() {
         {view === "Matchup lab" && <section className="section-layout">
           <div className="section-head" style={{ marginTop: 4 }}><div><div className="eyebrow">Head-to-head breakdown</div><h2>Matchup lab</h2><div className="section-sub">Select two players in the directory or compare the default 2026 season snapshot.</div></div><button className="secondary-button" onClick={() => goto("Players")}>Browse players <Icon name="arrow" size={13} /></button></div>
           <div className="notice">Player statistics are 2026 regular-season snapshots checked {statsCheckedAt}; NFL.com supplies directory profiles and StatMuse supplies position-ranked entries. Neither updates live. Scouting notes and the analyst panel are illustrative.</div>
-          <div className="comparison">{(comparePlayers.length === 2 ? comparePlayers : [players[0], players[1]]).map((player, index) => <div className="comparison-side" key={player.id}><div className="comparison-head"><small>{index === 0 ? "OFFENSE / 01" : "OFFENSE / 02"} · {player.position}</small><h3>{player.name}</h3></div><div className="compare-line"><span>Team / status</span><b>{player.team}</b></div><div className="compare-line"><span>Games played</span><b>{player.games}</b></div>{playerStatRows(player).map(stat => <div className="compare-line" key={stat.label}><span>{stat.label}</span><b>{stat.value}</b></div>)}<div className="compare-line"><span>Film cue</span><b style={{ fontFamily: "var(--font-body)", fontSize: 10, textAlign: "right", maxWidth: "62%" }}>{player.note}</b></div><a href={player.statsUrl} target="_blank" rel="noreferrer" className="section-sub">Official NFL.com player page</a></div>)}</div>
+          <div className="comparison">{(comparePlayers.length === 2 ? comparePlayers : [players[0], players[2]].filter((player): player is Player => Boolean(player))).map((player, index) => <div className="comparison-side" key={player.id}><div className="comparison-head"><small>{index === 0 ? "OFFENSE / 01" : "OFFENSE / 02"} · {player.position}</small><h3>{player.name}</h3></div><div className="compare-line"><span>Team / status</span><b>{player.team}</b></div><div className="compare-line"><span>Games played</span><b>{player.games}</b></div>{playerStatRows(player).map(stat => <div className="compare-line" key={stat.label}><span>{stat.label}</span><b>{stat.value}</b></div>)}<div className="compare-line"><span>Film cue</span><b style={{ fontFamily: "var(--font-body)", fontSize: 10, textAlign: "right", maxWidth: "62%" }}>{player.note}</b></div><a href={player.statsUrl} target="_blank" rel="noreferrer" className="section-sub">Official NFL.com player page</a></div>)}</div>
           <PlayerComparisonCharts players={chartPlayers} />
           <div className="section-head"><div><div className="eyebrow">Six ways to see it</div><h2>Simulated analyst panel</h2></div><span className="panel-tag">DEMO ANALYSIS</span></div>
           <div className="analysis-grid">{experts.map((expert, index) => <article className="analyst-card" key={expert.name}><div className="analyst-top"><span className="analyst-number">0{index + 1}</span><div><div className="analyst-name">{expert.name}</div><div className="analyst-role">{expert.role}</div></div></div><p>{expert.text}</p><div className="analyst-pick">Key read <b>{expert.pick}</b></div></article>)}</div>

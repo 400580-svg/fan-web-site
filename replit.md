@@ -11,6 +11,13 @@ Gridiron Central is a Next.js App Router and TypeScript fan site for NFL player 
 
 The Replit web preview runs the development server on port 5000.
 
+## Fresh import setup on Replit
+
+- The **Start application** workflow runs `npm run dev -- --port 5000`, bound to `0.0.0.0`. Use Run to start it and open Preview.
+- Provision Replit-managed Clerk for this project through the Auth setup. It supplies `CLERK_SECRET_KEY` and `CLERK_PUBLISHABLE_KEY`; `next.config.mjs` maps the public key to the Next.js SDK's expected variable.
+- Use the managed PostgreSQL `DATABASE_URL`. Apply `scripts/schema.sql` once to the development database for saved progress and online games. Do not run schema creation on application startup or add a production migration hook; Publish handles managed production schema changes.
+- A fresh import has a new Clerk user store and an empty database; previous accounts and saved games are not copied from the source project.
+
 ## Current data boundaries
 
 The player directory includes NFL.com 2026 offense stats, ESPN 2026 defense stats, and top-ten QB/RB/WR/TE leaderboards sourced from StatMuse, checked November 9, 2026. These are embedded snapshots, not live feeds, and must not be described as auto-updating. The leaderboards rank by passing yards for QBs, rushing yards for RBs, and receiving yards for WRs/TEs. Player film cues, matchup prompts, and the six-expert panel are illustrative/simulated, not official commentary.
