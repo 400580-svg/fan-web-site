@@ -48,17 +48,21 @@ async function getScoreboardEvents(dateKey: string): Promise<EspnEvent[]> {
 export async function GET() {
   try {
     const eventLists = await Promise.allSettled(
-      Array.from({ length: 8 }, (_, dayOffset) => getScoreboardEvents(easternDateKey(dayOffset)))
+      // Cover the Chargers' next game across a bye week as well as a normal week.
+      Array.from({ length: 15 }, (_, dayOffset) => getScoreboardEvents(easternDateKey(dayOffset)))
     );
     const events = eventLists.flatMap(result => result.status === "fulfilled" ? result.value : []);
     const nextGame = events
       .filter(event => Date.parse(event.date) > Date.now())
       .filter(event => event.competitions?.[0]?.status?.type?.state === "pre")
+      .filter(event => event.competitions?.[0]?.competitors?.some(
+        competitor => competitor.team.abbreviation === "LAC" || competitor.team.displayName === "Los Angeles Chargers"
+      ))
       .sort((a, b) => Date.parse(a.date) - Date.parse(b.date))[0];
 
     if (!nextGame) {
       return Response.json(
-        { error: "No upcoming NFL game was found in the schedule." },
+        { error: "No upcoming Chargers game was found in the schedule." },
         { status: eventLists.some(result => result.status === "rejected") ? 502 : 404 }
       );
     }
@@ -89,7 +93,7 @@ export async function GET() {
       sourceUrl: "https://www.espn.com/nfl/schedule"
     });
   } catch (error) {
-    console.error("Could not load the upcoming NFL matchup.", error);
-    return Response.json({ error: "The NFL schedule is temporarily unavailable." }, { status: 502 });
+    console.error("Could not load the upcoming Chargers matchup.", error);
+    return Response.json({ error: "The Chargers schedule is temporarily unavailable." }, { status: 502 });
   }
 }

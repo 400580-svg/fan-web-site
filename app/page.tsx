@@ -796,7 +796,7 @@ export default function Home() {
             </div>
           </section>
           <div className="dashboard-grid">
-            <section className="panel"><header className="panel-header"><div><div className="panel-title">Matchup of the week</div><div className="panel-caption">{matchupLoading ? "Loading the next scheduled game…" : "Next scheduled NFL game · Schedule from ESPN."}</div></div><span className="panel-tag">NEXT GAME</span></header>
+            <section className="panel"><header className="panel-header"><div><div className="panel-title">Matchup of the week</div><div className="panel-caption">{matchupLoading ? "Loading the next Chargers game…" : "Next Chargers game · Schedule from ESPN."}</div></div><span className="panel-tag">CHARGERS</span></header>
               {matchupLoading
                 ? <div className="matchup-message" role="status">Finding the next game…</div>
                 : matchupError || !upcomingMatchup
