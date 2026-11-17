@@ -11,8 +11,9 @@ import { seasonPlayers, type PlayerProfile as Player } from "@/lib/player-direct
 import { defenseStatsUrl } from "@/lib/defense-2026";
 import PlayCallingGame from "./components/PlayCallingGame";
 import GameHistory from "./components/GameHistory";
+import QuickQuiz from "./components/QuickQuiz";
 
-type View = "Overview" | "Players" | "Game day" | "Matchup lab" | "Photo gallery" | "My Team" | "Game history";
+type View = "Overview" | "Players" | "Game day" | "Quick quiz" | "Matchup lab" | "Photo gallery" | "My Team" | "Game history";
 type Play = { id: string; name: string; formation: string; personnel: string; concept: string; situation: string; note: string; tags?: string[] };
 type Lineup = { id: string; name: string; format: string; quarterback: string; runningBack: string; receiver: string; tightEnd: string; note: string };
 type ModalState = { kind: "play" | "lineup"; item?: Play | Lineup } | null;
@@ -240,7 +241,8 @@ function Icon({ name, size = 18 }: { name: string; size?: number }) {
     bell: "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4",
     shield: "M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11z",
     bolt: "M13 2 4 14h6l-1 8 11-12h-6l2-8z",
-    trend: "M3 17l6-6 4 4 8-8m-6 0h6v6"
+    trend: "M3 17l6-6 4 4 8-8m-6 0h6v6",
+    quiz: "M9.5 9a2.5 2.5 0 1 1 4.2 1.8c-1.1 1-1.7 1.4-1.7 2.7M12 17h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
   };
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name] || paths.grid} /></svg>;
 }
@@ -716,7 +718,7 @@ export default function Home() {
   const isEditing = Boolean(modal?.item);
 
   const navItems: { title: View; icon: string }[] = [
-    { title: "Overview", icon: "grid" }, { title: "Players", icon: "users" }, { title: "Game day", icon: "play" }, { title: "Matchup lab", icon: "compare" }, { title: "Photo gallery", icon: "trend" }, { title: "My Team", icon: "lineup" }, { title: "Game history", icon: "history" }
+    { title: "Overview", icon: "grid" }, { title: "Players", icon: "users" }, { title: "Game day", icon: "play" }, { title: "Quick quiz", icon: "quiz" }, { title: "Matchup lab", icon: "compare" }, { title: "Photo gallery", icon: "trend" }, { title: "My Team", icon: "lineup" }, { title: "Game history", icon: "history" }
   ];
   const syncLabel = !isLoaded
     ? "CHECKING ACCOUNT"
@@ -947,6 +949,7 @@ export default function Home() {
             setToast(isSignedIn ? "Your offense and defense are saved to My Team." : "Your offense and defense are saved on this device.");
           }}
         />}
+        {view === "Quick quiz" && <QuickQuiz />}
 
         {view === "Matchup lab" && <section className="section-layout">
           <div className="section-head" style={{ marginTop: 4 }}><div><div className="eyebrow">Game of the week</div><h2>Matchup lab</h2><div className="section-sub">Team comparison follows the next Chargers game shown on the dashboard.</div></div><button className="secondary-button" onClick={() => goto("Players")}>Browse players <Icon name="arrow" size={13} /></button></div>
