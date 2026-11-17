@@ -3,7 +3,6 @@
 import { SignIn, useClerk, useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import PlayerComparisonCharts from "./components/PlayerComparisonCharts";
 import { UserProgress, userProgressSchema, type SavedBotGame } from "@/lib/progress";
 import { leaderboardConfig, type LeaderboardPosition } from "@/lib/top-ten-2026";
 import { getPlayerHeadshot } from "@/lib/player-headshots";
@@ -114,6 +113,15 @@ function formatKickoff(isoDate: string) {
     minute: "2-digit",
     timeZoneName: "short"
   }).format(new Date(isoDate));
+}
+function recordWinPercentage(record: string | null) {
+  const match = record?.match(/^(\d+)-(\d+)(?:-(\d+))?$/);
+  if (!match) return null;
+  const wins = Number(match[1]);
+  const losses = Number(match[2]);
+  const ties = Number(match[3] || 0);
+  const games = wins + losses + ties;
+  return games ? `${(((wins + ties / 2) / games) * 100).toFixed(1)}%` : null;
 }
 const demoPlays: Play[] = [
   { id: "d1", name: "Blue Orbit", formation: "Gun Trips Right", personnel: "11 personnel", concept: "Choice / Sail", situation: "2nd & medium", note: "Read the nickel leverage. Alert the boundary fade if the safety rotates down.", tags: ["quick game", "coverage read"] },
@@ -558,6 +566,19 @@ export default function Home() {
   const chiefsPercent = totalPollVotes ? 100 - chargersPercent : 0;
   const comparePlayers = selected.map(id => players.find(player => player.id === id)).filter((player): player is Player => Boolean(player));
   const chartPlayers = comparePlayers.length === 2 ? comparePlayers : [players[0], players[2]].filter((player): player is Player => Boolean(player));
+  const gameOfWeekTeams = useMemo(() => {
+    if (!upcomingMatchup) return [];
+    return [
+      { team: upcomingMatchup.awayTeam, label: "AWAY TEAM" },
+      { team: upcomingMatchup.homeTeam, label: "HOME TEAM" }
+    ].map(({ team, label }) => ({
+      team,
+      label,
+      quarterback: players
+        .filter(player => player.position === "QB" && player.team.toLowerCase() === team.name.toLowerCase())
+        .sort((a, b) => (b.passingYards ?? -1) - (a.passingYards ?? -1))[0] ?? null
+    }));
+  }, [upcomingMatchup, players]);
   const openEditor = (kind: "play" | "lineup", item?: Play | Lineup) => {
     setFormError("");
     setModal({ kind, item });
@@ -928,10 +949,46 @@ export default function Home() {
         />}
 
         {view === "Matchup lab" && <section className="section-layout">
-          <div className="section-head" style={{ marginTop: 4 }}><div><div className="eyebrow">Head-to-head breakdown</div><h2>Matchup lab</h2><div className="section-sub">Select two players in the directory or compare the default 2026 season snapshot.</div></div><button className="secondary-button" onClick={() => goto("Players")}>Browse players <Icon name="arrow" size={13} /></button></div>
-          <div className="notice">Player statistics are 2026 regular-season snapshots checked {statsCheckedAt}; NFL.com supplies directory profiles and StatMuse supplies position-ranked entries. Neither updates live. Scouting notes and the analyst panel are illustrative.</div>
-          <div className="comparison">{(comparePlayers.length === 2 ? comparePlayers : [players[0], players[2]].filter((player): player is Player => Boolean(player))).map((player, index) => <div className="comparison-side" key={player.id}><div className="comparison-head"><small>{index === 0 ? "OFFENSE / 01" : "OFFENSE / 02"} · {player.position}</small><h3>{player.name}</h3></div><div className="compare-line"><span>Team / status</span><b>{player.team}</b></div><div className="compare-line"><span>Games played</span><b>{player.games}</b></div>{playerStatRows(player).map(stat => <div className="compare-line" key={stat.label}><span>{stat.label}</span><b>{stat.value}</b></div>)}<div className="compare-line"><span>Film cue</span><b style={{ fontFamily: "var(--font-body)", fontSize: 10, textAlign: "right", maxWidth: "62%" }}>{player.note}</b></div><a href={player.statsUrl} target="_blank" rel="noreferrer" className="section-sub">Official NFL.com player page</a></div>)}</div>
-          <PlayerComparisonCharts players={chartPlayers} />
+          <div className="section-head" style={{ marginTop: 4 }}><div><div className="eyebrow">Game of the week</div><h2>Matchup lab</h2><div className="section-sub">Team comparison follows the next Chargers game shown on the dashboard.</div></div><button className="secondary-button" onClick={() => goto("Players")}>Browse players <Icon name="arrow" size={13} /></button></div>
+          {matchupLoading
+            ? <div className="matchup-message" role="status">Loading the Chargers matchup…</div>
+            : matchupError || !upcomingMatchup
+              ? <div className="matchup-message matchup-error" role="alert"><span>{matchupError || "No Chargers game is available."}</span><button className="thin-button" onClick={() => setMatchupReload(value => value + 1)}>Try again</button></div>
+              : <>
+                <div className="comparison team-comparison">
+                  {gameOfWeekTeams.map(({ team, label, quarterback }) => (
+                    <article className="comparison-side" key={team.id}>
+                      <header className="comparison-head team-comparison-head">
+                        <div><small>{label} · {team.abbreviation}</small><h3>{team.name}</h3></div>
+                        {team.logo && <img src={team.logo} alt={`${team.name} logo`} />}
+                      </header>
+                      <div className="compare-line"><span>Season record</span><b>{team.record || "Unavailable"}</b></div>
+                      <div className="compare-line"><span>Win percentage</span><b>{recordWinPercentage(team.record) || "Unavailable"}</b></div>
+                      <section className="team-quarterback" aria-label={`${team.name} quarterback stats`}>
+                        <div className="team-quarterback-heading"><span>QUARTERBACK</span><small>2026 season snapshot</small></div>
+                        {quarterback ? <>
+                          <h4>{quarterback.name}</h4>
+                          <div className="team-quarterback-stats">
+                            <div><span>Pass yards</span><b>{quarterback.passingYards?.toLocaleString("en-US") ?? "—"}</b></div>
+                            <div><span>Pass TD</span><b>{quarterback.passingTouchdowns ?? "—"}</b></div>
+                            <div><span>Interceptions</span><b>{quarterback.interceptions ?? "—"}</b></div>
+                            <div><span>Pass rating</span><b>{quarterback.passerRating?.toFixed(1) ?? "—"}</b></div>
+                            <div><span>Rush yards</span><b>{quarterback.rushingYards?.toLocaleString("en-US") ?? "—"}</b></div>
+                            <div><span>Games</span><b>{quarterback.games}</b></div>
+                          </div>
+                          <a className="team-quarterback-source" href={quarterback.statsUrl} target="_blank" rel="noreferrer">Player stats source</a>
+                        </> : <p className="team-quarterback-unavailable">No quarterback stats for this team are available in the current player snapshot.</p>}
+                      </section>
+                    </article>
+                  ))}
+                </div>
+                <div className="team-comparison-footer">
+                  <span><b>KICKOFF</b>{formatKickoff(upcomingMatchup.startsAt)}</span>
+                  <span><b>VENUE</b>{upcomingMatchup.venue || "Venue unavailable"}</span>
+                  <a href={upcomingMatchup.sourceUrl} target="_blank" rel="noreferrer">ESPN schedule</a>
+                </div>
+              </>}
+          <div className="notice">Quarterback stats are 2026 regular-season snapshots checked {statsCheckedAt}. The analyst panel below is illustrative, not live team-specific analysis.</div>
           <div className="section-head"><div><div className="eyebrow">Six ways to see it</div><h2>Simulated analyst panel</h2></div><span className="panel-tag">DEMO ANALYSIS</span></div>
           <div className="analysis-grid">{experts.map((expert, index) => <article className="analyst-card" key={expert.name}><div className="analyst-top"><span className="analyst-number">0{index + 1}</span><div><div className="analyst-name">{expert.name}</div><div className="analyst-role">{expert.role}</div></div></div><p>{expert.text}</p><div className="analyst-pick">Key read <b>{expert.pick}</b></div></article>)}</div>
         </section>}
